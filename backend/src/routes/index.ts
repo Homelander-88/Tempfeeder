@@ -25,4 +25,4 @@ router.get("/topics",requireAuth,getTopics);
 router.post("/topics",addTopic);
 router.get("/subtopics",requireAuth,getSubtopics);
 router.post("/subtopics",addSubtopic);
-export {router as healthRouter};
+export {router as fullRouter};
