@@ -27,9 +27,14 @@ export const register = async (_req:Request,res:Response)=>{
 
     users.push(newUser);
 
+    const jwtsecret = process.env.JWT_SECRET;
+    if(!jwtsecret){
+      console.error("JWT SECRET is not set to the environment variable");
+      return res.status(500).json({error:"Server configuration error"});
+    }
     const token = jwt.sign(
         {userId: newUser.id, email: newUser.email,},
-        "secret_key_spoon",
+        jwtsecret,
         { expiresIn: "3h"}
     );
     return res.status(201).json({
@@ -73,11 +78,17 @@ export const login = async (req: Request, res: Response) => {
       if (!passwordMatches) {
         return res.status(400).json({ error: "Invalid email or password" });
       }
-  
+
+      const jwtsecret = process.env.JWT_SECRET;
+
+      if (!jwtsecret) {
+        console.error("JWT_SECRET is not set!");
+        return res.status(500).json({ error: "Server configuration error" });
+      }
       // 4) Create a new JWT token
       const token = jwt.sign(
         { userId: existingUser.id, email: existingUser.email },
-        "secret_key_spoon",
+        jwtsecret,
         { expiresIn: "3h" }
       );
   
