@@ -1,9 +1,7 @@
 import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-
-// In-memory list of users (temporary, until we use a real database)
-const users: { id: number; email: string; passwordHash: string }[] = [];
+import pool from "../db/connection";
 
 export const register = async (_req:Request,res:Response)=>{
     try{
@@ -12,22 +10,24 @@ export const register = async (_req:Request,res:Response)=>{
     {
         return res.status(400).json({error:"Email and password required"});
     }
-    const existingUser = users.find((u) => u.email === email);
-    if (existingUser) {
+    const existingUser = await pool.query(
+      "SELECT id FROM users WHERE email = $1",
+      [email]
+    );
+    if (existingUser.rows.length>0) {
       return res.status(400).json({ error: "User already exists" });
     }
 
     const passwordHash = await bcrypt.hash(password,10);
 
-    const newUser ={
-        id: users.length+1,
-        email,
-        passwordHash
-    };
-
-    users.push(newUser);
-
+    const result = await pool.query(
+      "INSERT INTO users (email, password_hash) VALUES ($1,$2) RETURNING id,email",
+      [email,passwordHash]
+    );
+    
+    const newUser = result.rows[0];
     const jwtsecret = process.env.JWT_SECRET;
+    
     if(!jwtsecret){
       console.error("JWT SECRET is not set to the environment variable");
       return res.status(500).json({error:"Server configuration error"});
@@ -64,15 +64,20 @@ export const login = async (req: Request, res: Response) => {
       }
   
       // 2) Find user by email
-      const existingUser = users.find((u) => u.email === email);
-      if (!existingUser) {
+      const result = await pool.query(
+        "SELECT id, email, password_hash FROM users WHERE email = $1",
+        [email]
+      )
+
+      if (result.rows.length === 0) {
         return res.status(400).json({ error: "Invalid email or password" });
       }
   
+      const existingUser = result.rows[0];
       // 3) Compare password with stored hash
       const passwordMatches = await bcrypt.compare(
         password,
-        existingUser.passwordHash
+        existingUser.password_hash
       );
   
       if (!passwordMatches) {

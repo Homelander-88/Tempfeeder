@@ -1,14 +1,8 @@
 import { Request, Response } from "express";
+import pool from "../db/connection";
 
-// In-memory topics; each topic belongs to a course (courseId)
-const topics = [
-  { id: 1, courseId: 1, name: "Introduction to Limits" },
-  { id: 2, courseId: 1, name: "Derivatives Basics" },
-  { id: 3, courseId: 2, name: "Kinematics" }
-];
-
-// GET /api/topics?courseId=1
-export const getTopics = (req: Request, res: Response) => {
+export const getTopics = async(req: Request, res: Response) => {
+  try{
   const courseIdParam = req.query.courseId;
 
   if (!courseIdParam) {
@@ -22,12 +16,21 @@ export const getTopics = (req: Request, res: Response) => {
     return res.status(400).json({ error: "courseId must be a number" });
   }
 
-  const result = topics.filter((t) => t.courseId === courseId);
-  return res.json(result);
+  const result = await pool.query(
+    "SELECT id,course_id as \"courseId\",name FROM topics WHERE course_id = $1 ORDER BY id",
+    [courseId]
+  );
+  return res.json(result.rows);
+  }catch(err)
+  {
+    console.error("Error fetching topics:",err);
+    res.status(500).json({error:"Internal server error"});
+  }
 };
 
 // POST /api/topics  body: { "name": "...", "courseId": 1 }
-export const addTopic = (req: Request, res: Response) => {
+export const addTopic = async(req: Request, res: Response) => {
+  try{
   const { name, courseId } = req.body;
 
   if (!name || !courseId) {
@@ -36,12 +39,15 @@ export const addTopic = (req: Request, res: Response) => {
       .json({ error: "Both name and courseId are required" });
   }
 
-  const newTopic = {
-    id: topics.length + 1,
-    courseId: Number(courseId),
-    name
-  };
-
-  topics.push(newTopic);
-  return res.status(201).json(newTopic);
+  const newTopic = await pool.query(
+    "INSERT INTO topics (name,course_id) VALUES ($1,$2) RETURNING id,course_id as \"courseId\", name",
+    [name,courseId]
+  );
+  return res.status(201).json(newTopic.rows[0]);
+  }
+  catch(err)
+  {
+    console.error("Error adding topics:",err);
+    res.status(500).json({error:"Internal server error"});
+  }
 };

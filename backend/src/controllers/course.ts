@@ -1,28 +1,32 @@
 import { Response,Request } from "express";
-// Each subject belongs to a specific semester
-const course = [
-    { id: 1, semesterId: 1, name: "Maths 1" },
-    { id: 2, semesterId: 1, name: "Physics 1" },
-    { id: 3, semesterId: 2, name: "Maths 2" }
-  ];
+import pool from "../db/connection";
 
-  export const getCourse = (req: Request, res: Response) => {
+  export const getCourse = async(req: Request, res: Response) => {
+    try{
     const semesterIdParam = req.query.semesterId;
     if (!semesterIdParam) {
-      return res
-        .status(400)
-        .json({ error: "semesterId query parameter is required" });
+      return res.status(400).json({ error: "semesterId query parameter is required" });
     }
+
     const semesterId = parseInt(semesterIdParam as string, 10);
     if (isNaN(semesterId)) {
       return res.status(400).json({ error: "semesterId must be a number" });
     }
-    const result = course.filter((c) => c.semesterId === semesterId);
-    return res.json(result);
+
+    const result = await pool.query(
+      "SELECT id,semester_id as \"semesterId\",name FROM courses WHERE semester_id = $1 ORDER BY id",
+      [semesterId]
+    );
+    return res.json(result.rows);
+  }catch(err)
+  {
+    console.error("Error fetching courses:",err);
+    res.status(500).json({error:"Internal server error"});
+  }
   };
-  export const addCourse = (req: Request, res: Response) => {
+  export const addCourse = async (req: Request, res: Response) => {
+    try{
     const { name, semesterId } = req.body;
-  
     // 1) Validate required fields
     if (!name || !semesterId) {
       return res
@@ -31,15 +35,14 @@ const course = [
     }
   
     // 2) Build the new course/subject object
-    const newCourse = {
-      id: course.length + 1,          // simple auto-increment
-      semesterId: Number(semesterId),
-      name
-    };
-  
-    // 3) Save it in our in-memory list
-    course.push(newCourse);
-  
-    // 4) Return 201 Created with the new object
-    return res.status(201).json(newCourse);
+    const newCourse = await pool.query(
+      "INSERT INTO courses (name,semester_id) VALUES ($1,$2) RETURNING id,semester_id as \"semesterId\", name",
+      [name,semesterId]
+    );
+    return res.status(201).json(newCourse.rows[0]);
+  }catch(err)
+  {
+    console.error("Error adding courses:",err);
+    res.status(500).json({error:"Internal server error"});
+  }
   };
