@@ -9,6 +9,8 @@ import {getCourse,addCourse} from "../controllers/course";
 import {getTopics,addTopic} from "../controllers/topics";
 import { getSubtopics,addSubtopic } from "../controllers/subtopics";
 import { register,login } from "../controllers/auth";
+import { getSubtopicContent,addSubtopicContent } from "../controllers/subtopicContent";
+
 const router = Router();
 router.get("/health", getHealth);
 router.post("/auth/register",register);
@@ -25,4 +27,7 @@ router.get("/topics",requireAuth,getTopics);
 router.post("/topics",requireAuth,addTopic);
 router.get("/subtopics",requireAuth,getSubtopics);
 router.post("/subtopics",requireAuth,addSubtopic);
+router.get("/subtopics/:subtopicId/content", requireAuth,getSubtopicContent);
+router.post("/subtopics/:subtopicId/content",  requireAuth,addSubtopicContent);
+
 export {router as fullRouter};
