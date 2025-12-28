@@ -53,20 +53,76 @@
   min-width: fit-content;
 }
 
-.register-link {
+.modes {
+  position: relative;
+}
+
+.modes-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 8px 16px;
+  background: transparent;
+  border: 1px solid #26262A;
   color: #c4c7cc;
-  text-decoration: none;
   font-size: 14px;
   font-weight: 500;
   border-radius: 6px;
+  cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;
 }
 
-.register-link:hover {
+.modes-btn:hover {
   background-color: #26262A;
   color: #2563EB;
+  border-color: #2563EB;
+}
+
+.modes-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.modes-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background-color: #1A1A1C;
+  border: 1px solid #26262A;
+  border-radius: 8px;
+  min-width: 240px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  animation: fadeInDown 0.2s ease;
+  overflow: hidden;
+}
+
+.modes-option {
+  padding: 12px 14px;
+  border-bottom: 1px solid #26262A;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.modes-option:last-child {
+  border-bottom: none;
+}
+
+.modes-option:hover {
+  background-color: #26262A;
+}
+
+.modes-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #c4c7cc;
+}
+
+.modes-desc {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #9CA3AF;
 }
 
 .icon-btn {
@@ -89,6 +145,7 @@
 
 .user-profile {
   margin-left: 8px;
+  position: relative;
 }
 
 .avatar {
@@ -96,6 +153,7 @@
   height: 36px;
   border-radius: 50%;
   background: linear-gradient(135deg, #2563EB 0%, #1E40AF 100%);
+  border: none;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -108,6 +166,148 @@
 
 .avatar:hover {
   transform: scale(1.05);
+}
+
+.profile-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background-color: #1A1A1C;
+  border: 1px solid #26262A;
+  border-radius: 8px;
+  min-width: 240px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  animation: fadeInDown 0.2s ease;
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.profile-info {
+  padding: 16px;
+}
+
+.profile-username {
+  font-size: 16px;
+  font-weight: 600;
+  color: #c4c7cc;
+  margin-bottom: 4px;
+}
+
+.profile-email {
+  font-size: 13px;
+  color: #9CA3AF;
+}
+
+.profile-divider {
+  height: 1px;
+  background-color: #26262A;
+  margin: 0;
+}
+
+.semester-section {
+  position: relative;
+}
+
+.semester-btn {
+  width: calc(100% - 32px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background-color: transparent;
+  border: none;
+  color: #c4c7cc;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  text-align: left;
+}
+
+.semester-btn:hover {
+  background-color: #26262A;
+}
+
+.semester-btn svg {
+  width: 16px;
+  height: 16px;
+  color: #9CA3AF;
+}
+
+.semester-dropdown {
+  position: absolute;
+  top: calc(100% - 4px);
+  left: 0;
+  right: 0;
+  background-color: #262629;
+  border: 1px solid #26262A;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 1001;
+  animation: fadeInDown 0.2s ease;
+}
+
+.semester-option {
+  width: 100%;
+  padding: 10px 16px;
+  background-color: transparent;
+  border: none;
+  color: #9CA3AF;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.semester-option:hover {
+  background-color: #26262A;
+  color: #c4c7cc;
+}
+
+.semester-option.active {
+  background-color: rgba(37, 99, 235, 0.2);
+  color: #2563EB;
+  font-weight: 600;
+}
+
+.logout-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: transparent;
+  border: none;
+  color: #FF4444;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  border-radius: 0 0 8px 8px;
+  text-align: left;
+}
+
+.logout-btn:hover {
+  background-color: #26262A;
+}
+
+.logout-btn svg {
+  width: 16px;
+  height: 16px;
 }
 
 /* Responsive */

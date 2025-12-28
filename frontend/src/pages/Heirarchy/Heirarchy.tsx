@@ -30,7 +30,7 @@ const Heirarchy: React.FC<HeirarchyProps> = ({ onNavigateToLogin, onNavigateToCo
 
   return (
     <div className="heirarchy-view">
-      <Header onMenuToggle={handleMenuToggle} onNavigate={handleNavigate} />
+      <Header onMenuToggle={handleMenuToggle} onNavigate={handleNavigate} onLogout={onNavigateToLogin} />
       <Sidebar isCollapsed={sidebarCollapsed} />
 
       <div className={`heirarchy-main ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
