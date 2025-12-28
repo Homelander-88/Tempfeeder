@@ -34,16 +34,26 @@ body {
 }
 
 /* ===== Layout ===== */
+/* Keep content-main in the same position */
 .content-main {
-  margin-left: 240px;
+  margin-left: 240px; /* fixed starting position */
   margin-top: 80px;
   padding: 32px;
   min-height: calc(100vh - 80px);
-  transition: margin-left 0.3s ease;
+  transition: padding 0.3s ease; /* optional smoothness for padding if needed */
 }
 
+/* Do not shift content when sidebar collapses */
 .content-main.sidebar-collapsed {
-  margin-left: 72px;
+  margin-left: 240px; /* keep same as expanded */
+}
+.sidebar {
+  width: 240px;
+  transition: width 0.3s ease;
+}
+
+.sidebar.collapsed {
+  width: 72px; /* collapsed sidebar width */
 }
 
 .content-header h1 {
