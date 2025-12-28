@@ -120,3 +120,64 @@
     font-size: 18px;
   }
 }
+/* ===== Mode Dropdown Styling ===== */
+.mode-dropdown {
+  position: relative;
+  display: inline-block;
+  margin-right: 12px; /* space between dropdown and Register link */
+}
+
+.mode-btn {
+  background-color: #26262A;
+  color: #c4c7cc;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mode-btn:hover {
+  background-color: #1E1E20;
+}
+
+.mode-dropdown-menu {
+  position: absolute;
+  top: 40px; /* below the button */
+  right: 0; /* align right with button */
+  background: #1A1A1C;
+  border: 1px solid #26262A;
+  border-radius: 6px;
+  overflow: hidden;
+  min-width: 140px;
+  z-index: 1000;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+}
+
+.mode-dropdown-menu div {
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.mode-dropdown-menu div:hover {
+  background: #26262A;
+}
+
+.mode-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.mode-dot.deep { background-color: #22c55e; }  /* green */
+.mode-dot.normal { background-color: #facc15; } /* yellow */
+.mode-dot.rush { background-color: #ef4444; }   /* red */
