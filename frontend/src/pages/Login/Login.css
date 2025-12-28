@@ -65,11 +65,6 @@ html, body {
   display: flex;
   justify-content: center;
   transition: transform 0.35s ease;
-  box-shadow:
-    0 10px 20px rgba(0, 0, 0, 0.7),
-    0 0 28px rgba(255, 255, 255, 0.45),
-    inset 0 0 8px rgba(255, 255, 255, 0.18);
-  transition: box-shadow 0.3s ease;
 }
 
 .back {
@@ -151,7 +146,8 @@ html, body {
   position: absolute;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%) translate(var(--eye-x, 0px), var(--eye-y, 0px));
+  transition: transform 0.25s ease-out;
 }
 
 .mouth {
@@ -169,7 +165,7 @@ html, body {
 
 .right-panel {
   width: 420px;
-  padding: 70px 60px;
+  padding: 80px 70px;
   background: transparent;
   display: flex;
   flex-direction: column;
@@ -179,16 +175,16 @@ html, body {
 .right-panel p {
   font-size: 14px;
   color: var(--text-secondary);
-  margin-bottom: 32px;
+  margin-bottom: 40px;
 }
 
 .right-panel input {
   background: var(--card-background);
   border: 1px solid var(--border-subtle);
   color: var(--text-primary);
-  padding: 14px 16px;
+  padding: 16px 18px;
   border-radius: 8px;
-  margin-bottom: 14px;
+  margin-bottom: 20px;
   font-size: 14px;
   outline: none;
 }
@@ -258,12 +254,12 @@ html, body {
 
 .brand {
   position: fixed;
-  top: 24px;    
-  left: 32px;
+  top: 24px;
+  left: 82px;
   color: var(--text-primary);
   letter-spacing: 0.3px;
   font-size: 55px;
-  font-weight: 700;
+  font-weight: 500;
   line-height: 1.2;
 }
 
@@ -275,6 +271,7 @@ html, body {
   font-weight: 600;
   line-height: 1.2;
   color: var(--text-primary);
+  text-align: center;
 }
 
 .brand-subtitle {
@@ -301,14 +298,14 @@ html, body {
 .login-card h2 {
   font-size: 32px;
   font-weight: 600;
-  margin-bottom: 10px;
+  margin-bottom: 16px;
   margin-left: 30px;
 }
 
 .subtitle {
   font-size: 10px;
   color: var(--text-secondary);
-  margin-bottom: 32px;
+  margin-bottom: 40px;
   letter-spacing: 0.5px;
 }
 
@@ -316,7 +313,7 @@ html, body {
   font-size: 12px;
   color: var(--text-muted);
   text-align: right;
-  margin-bottom: 22px;
+  margin-bottom: 28px;
   cursor: pointer;
 }
 
@@ -325,14 +322,46 @@ html, body {
 }
 
 .signup {
-  margin-top: 28px;
+  margin-top: 32px;
   font-size: 13px;
   color: var(--text-secondary);
+  text-align: center;
 }
 
 .signup span {
   color: var(--primary-accent);
   cursor: pointer;
+}
+
+.contact-section {
+  margin-top: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.contact-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.contact-icons {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+}
+
+.contact-icon {
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.contact-icon:hover {
+  color: var(--primary-accent);
 }
 
 .doll.sleep .eyes span {
@@ -374,8 +403,8 @@ html, body {
 .show-pwd {
   position: absolute;
   right: 12px;
-  top: 45%;
-  transform: translateY(-65%);
+  top: 37%;
+  transform: translateY(-50%);
   cursor: pointer;
   font-size: 12px;
   color: var(--primary-accent);

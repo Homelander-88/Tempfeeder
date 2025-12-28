@@ -2,7 +2,11 @@ import { useState } from 'react';
 import registerGif from '../../assets/WhatsApp GIF 2025-12-27 at 21.40.59.gif';
 import './Register.css';
 
-const Register = () => {
+interface RegisterProps {
+  onNavigateToLogin: () => void;
+}
+
+const Register = ({ onNavigateToLogin }: RegisterProps) => {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -156,7 +160,7 @@ const Register = () => {
             <div className="register-footer">
               <p>
                 Already have an account?{' '}
-                <a href="/login" className="login-link">
+                <a onClick={onNavigateToLogin} className="login-link" style={{ cursor: 'pointer' }}>
                   Sign in
                 </a>
               </p>
