@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Variants } from "framer-motion";
 import "./Auth.css";
-import "../Login/Login.css";
+import "./Auth1.css";
 
 export type AuthMode = "login" | "register";
 

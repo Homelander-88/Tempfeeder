@@ -5,7 +5,7 @@ import Heirarchy from "./pages/Heirarchy/Heirarchy";
 import CollegeDepartment from "./pages/CollegeDepartment/collegeDepartment";
 
 function App() {
-  const [currentPage, setCurrentPage] = useState<"login" | "register" | "content" | "heirarchy" | "collegeDepartment">("login");
+  const [currentPage, setCurrentPage] = useState<"auth"| "content" | "heirarchy" | "collegeDepartment">("auth");
 
   const navigateToAuth = () => setCurrentPage("auth");
   const navigateToContent = () => setCurrentPage("content");
@@ -14,12 +14,10 @@ function App() {
 
   const renderPage = () => {
     switch (currentPage) {
-      case "login":
-        return <Login onNavigateToRegister={navigateToRegister} onNavigateToContent={navigateToContent} />;
-      case "register":
-        return <Register onNavigateToLogin={navigateToLogin} onNavigateToCollegeDepartment={navigateToCollegeDepartment} />;
+      case "auth":
+        return <Auth onNavigateToContent={navigateToContent} />;
       case "collegeDepartment":
-        return <CollegeDepartment onNavigateToContent={navigateToContent} onNavigateToLogin={navigateToLogin} />;
+        return <CollegeDepartment onNavigateToContent={navigateToContent} onNavigateToLogin={navigateToAuth} />;
       case "content":
         return <ContentView onNavigateToLogin={navigateToAuth} onNavigateToHeirarchy={navigateToHeirarchy} />;
       case "heirarchy":
@@ -33,3 +31,4 @@ function App() {
 }
 
 export default App;
+
