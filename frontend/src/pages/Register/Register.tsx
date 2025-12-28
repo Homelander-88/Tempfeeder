@@ -4,9 +4,10 @@ import './Register.css';
 
 interface RegisterProps {
   onNavigateToLogin: () => void;
+  onNavigateToCollegeDepartment: () => void;
 }
 
-const Register = ({ onNavigateToLogin }: RegisterProps) => {
+const Register = ({ onNavigateToLogin, onNavigateToCollegeDepartment }: RegisterProps) => {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -59,6 +60,7 @@ const Register = ({ onNavigateToLogin }: RegisterProps) => {
     setIsLoading(true);
 
     try {
+      onNavigateToCollegeDepartment();//remove this line
       const response = await fetch('http://localhost:5000/api/auth/register', {
         method: 'POST',
         headers: {
@@ -84,9 +86,8 @@ const Register = ({ onNavigateToLogin }: RegisterProps) => {
         localStorage.setItem('user', JSON.stringify(data.user));
       }
 
-      // Redirect to home page
-      window.history.pushState({}, '', '/');
-      window.location.reload();
+      // Navigate to college department page
+      onNavigateToCollegeDepartment();
     } catch (err) {
       setError('Network error. Please try again.');
       setIsLoading(false);
