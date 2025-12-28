@@ -53,9 +53,10 @@ const dollsOrder = ["purple", "yellow", "pink", "orange"];
 
 interface LoginProps {
   onNavigateToRegister: () => void;
+  onNavigateToContent: () => void;
 }
 
-export default function Login({ onNavigateToRegister }: LoginProps) {
+export default function Login({ onNavigateToRegister, onNavigateToContent }: LoginProps) {
   const [eye, setEye] = useState({ x: 0, y: 0 });
   const [mode, setMode] = useState<Mode>("normal");
   const [peekDoll, setPeekDoll] = useState<string | null>(null);
@@ -179,7 +180,7 @@ export default function Login({ onNavigateToRegister }: LoginProps) {
 
           <div className={`forgot fade-in`} style={{ animationDelay: "0.7s" }}>Forgot password?</div>
 
-          <button className="fade-in" style={{ animationDelay: "0.8s" }} onClick={() => setMode("error")}>
+          <button className="fade-in" style={{ animationDelay: "0.8s" }} onClick={onNavigateToContent}>
             Sign in
           </button>
 

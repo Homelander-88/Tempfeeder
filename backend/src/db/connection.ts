@@ -1,4 +1,5 @@
 import {Pool} from "pg";
+import { createClient } from '@supabase/supabase-js';
 
 const pool = new Pool({
     host: process.env.DB_HOST,
@@ -8,8 +9,21 @@ const pool = new Pool({
     password: process.env.DB_PASSWORD,
 });
 
+const supabaseUrl = process.env.SUPABASE_URL
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error('Missing Supabase environment variables');
+  }
+
+export const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  }
+})
 pool.on("connect",() =>{
-    console.log("Connected to postgres...");
+    console.log("Connected to supabase database...");
 });
 
 pool.on("error", (err)=>{

@@ -1,0 +1,92 @@
+.heirarchy-view {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: white;
+}
+
+.heirarchy-main {
+  margin-left: 280px;
+  margin-top: 80px;
+  padding: 40px;
+  transition: margin-left 0.3s ease;
+  min-height: calc(100vh - 80px);
+}
+
+.heirarchy-main.sidebar-collapsed {
+  margin-left: 80px;
+}
+
+.heirarchy-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.heirarchy-header h1 {
+  font-size: 3rem;
+  margin-bottom: 10px;
+  font-weight: 700;
+}
+
+.heirarchy-header p {
+  font-size: 1.2rem;
+  opacity: 0.9;
+}
+
+.heirarchy-body {
+  max-width: 800px;
+  width: 100%;
+}
+
+.heirarchy-card {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: 20px;
+  padding: 40px;
+  text-align: center;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+}
+
+.heirarchy-card h2 {
+  font-size: 2rem;
+  margin-bottom: 20px;
+}
+
+.heirarchy-card p {
+  font-size: 1.1rem;
+  margin-bottom: 30px;
+  opacity: 0.9;
+}
+
+.heirarchy-actions {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+}
+
+.heirarchy-actions button {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.heirarchy-actions button:first-child {
+  background: #f5576c;
+  color: white;
+}
+
+.heirarchy-actions button:first-child:hover {
+  background: #e74c3c;
+}
+
+.heirarchy-actions button:last-child {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.heirarchy-actions button:last-child:hover {
+  background: rgba(255, 255, 255, 0.3);
+}

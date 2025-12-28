@@ -1,0 +1,92 @@
+.content-view {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.content-main {
+  margin-left: 280px;
+  margin-top: 80px;
+  padding: 40px;
+  transition: margin-left 0.3s ease;
+  min-height: calc(100vh - 80px);
+}
+
+.content-main.sidebar-collapsed {
+  margin-left: 80px;
+}
+
+.content-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.content-header h1 {
+  font-size: 3rem;
+  margin-bottom: 10px;
+  font-weight: 700;
+}
+
+.content-header p {
+  font-size: 1.2rem;
+  opacity: 0.9;
+}
+
+.content-body {
+  max-width: 800px;
+  width: 100%;
+}
+
+.content-card {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: 20px;
+  padding: 40px;
+  text-align: center;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+}
+
+.content-card h2 {
+  font-size: 2rem;
+  margin-bottom: 20px;
+}
+
+.content-card p {
+  font-size: 1.1rem;
+  margin-bottom: 30px;
+  opacity: 0.9;
+}
+
+.content-actions {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+}
+
+.content-actions button {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.content-actions button:first-child {
+  background: #2563EB;
+  color: white;
+}
+
+.content-actions button:first-child:hover {
+  background: #1d4ed8;
+}
+
+.content-actions button:last-child {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.content-actions button:last-child:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
