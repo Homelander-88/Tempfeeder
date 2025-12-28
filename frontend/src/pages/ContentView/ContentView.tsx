@@ -145,7 +145,7 @@ const ContentView: React.FC<ContentViewProps> = ({
 
   return (
     <div className="content-view">
-      <Header onMenuToggle={handleMenuToggle} onNavigate={handleNavigate} onLogout={onNavigateToLogin} />
+      <Header onMenuToggle={handleMenuToggle} onLogout={onNavigateToLogin} />
       <Sidebar isCollapsed={sidebarCollapsed} />
 
       <div className={`content-main ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
