@@ -1,17 +1,38 @@
 import { Request,Response } from "express";
 import pool from "../db/connection";
 
-// GET: Return all departments for a specific collegeId
+// GET: Return all departments for a specific college (by ID or name)
 export const getDepartments = async(_req:Request,res:Response) =>{
   try{
-    const collegeId = parseInt(_req.query.collegeId as string);
-    if(isNaN(collegeId)){
-        return res.status(400).json({ error:"college id parameter is required"});
+    const collegeIdParam = _req.query.collegeId as string;
+    const collegeNameParam = _req.query.collegeName as string;
+
+    let query: string;
+    let params: any[];
+
+    if (collegeIdParam) {
+      // Get by college ID
+      const collegeId = parseInt(collegeIdParam);
+      if(isNaN(collegeId)){
+          return res.status(400).json({ error:"Invalid college ID"});
+      }
+      query = "SELECT id, college_id as \"collegeId\", name FROM departments WHERE college_id = $1 ORDER BY id";
+      params = [collegeId];
+    } else if (collegeNameParam) {
+      // Get by college name
+      query = `
+        SELECT d.id, d.college_id as "collegeId", d.name
+        FROM departments d
+        JOIN colleges c ON d.college_id = c.id
+        WHERE c.name = $1
+        ORDER BY d.id
+      `;
+      params = [collegeNameParam];
+    } else {
+      return res.status(400).json({ error: "Either collegeId or collegeName parameter is required" });
     }
-    const result = await pool.query(
-      "SELECT id, college_id as \" collegeId\", name FROM departments WHERE college_id = $1 ORDER BY id",
-      [collegeId]
-    );
+
+    const result = await pool.query(query, params);
     return res.json(result.rows);
   }catch(err)
   {

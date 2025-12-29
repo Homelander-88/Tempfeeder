@@ -1,264 +1,215 @@
-#  Spoonfeeder
+# Spoon Edu Platform
 
-A web-based **structured learning system** that removes confusion, distraction, and randomness from studying by enforcing a strict academic hierarchy and learning flow.
+A comprehensive educational platform with React frontend and Node.js backend.
 
----
-
-## Project Philosophy
-
-Spoonfeeder follows a **discipline over freedom** approach to learning:
-
-- **Strict academic hierarchy** — no skipping levels  
-- **Fixed learning order** — structured progression  
-- **Syllabus-aligned** — step-by-step learning  
-- **No content overload** — focused, curated material  
-
----
-
-## Core Principles
-
-### Academic Hierarchy (Strict Order)
-
-College → Department → Semester → Course → Topic → Subtopic
-
----
-
-### Learning Order (Per Subtopic)
-
-1. Required Video  
-2. Curated PPT / Notes  
-3. Concept-Testing Questions  
-4. Answers  
-5. Move to Next Subtopic  
-
----
-
-### Study Modes
-
-- **Study Mode**
-  - Videos, PPTs, questions, answers
-  - Tests
-  - AI support
-
-- **Normal Mode**
-  - Videos, PPTs, questions
-
-- **Rush / Revision Mode**
-  - Only PPTs and questions
-  - No videos
-
----
-
-### Embedded AI Support
-
-- ChatGPT panel for **doubt clarification**
-- AI acts as a **support tool**, not the primary teacher
-
----
-
-## Tech Stack
-
-### Backend
-- **Runtime**: Node.js  
-- **Framework**: Express.js  
-- **Language**: TypeScript  
-- **Database**: PostgreSQL  
-- **Authentication**: JWT (JSON Web Tokens)  
-- **Password Hashing**: bcryptjs  
-
-### Frontend
-- **Framework**: React  
-- **Language**: TypeScript  
-- **Build Tool**: Create React App  
-
-### Development Tools
-- **Hot Reload**: nodemon + ts-node  
-- **Environment Variables**: dotenv  
-
----
-
-## Getting Started
+## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js (v16+)
-- PostgreSQL (v12+)
+- Node.js (v18 or higher)
+- PostgreSQL (v12 or higher)
 - npm or yarn
 
----
-
-## Backend Setup
-
+### 1. Clone and Install Dependencies
 ```bash
-cd backend
-npm install
+# Install all dependencies (frontend, backend, and root)
+npm run install:all
+
+# Or install manually:
+npm install                    # Root dependencies
+cd frontend && npm install     # Frontend dependencies
+cd ../backend && npm install   # Backend dependencies
 ```
 
-### Database Setup
+### 2. Setup Database
 ```bash
-psql -U postgres -c "CREATE DATABASE spoonfeeder;"
-psql -U postgres -d spoonfeeder -f src/db/schema.sql
+# Make setup script executable (Linux/Mac)
+chmod +x setup-backend.sh
+
+# Run setup script (includes sample data)
+./setup-backend.sh
+
+# Or setup manually:
+# 1. Create PostgreSQL database: spoon_edu
+# 2. Run: psql -U postgres -d spoon_edu -f backend/src/db/schema.sql
+# 3. Run: psql -U postgres -d spoon_edu -f backend/src/db/seed.sql
 ```
-### Environment Variables (backend/.env)
-```bash
-PORT=5000
-JWT_SECRET=your_super_secret_key_here
+
+### 3. Configure Environment Variables
+
+Edit `backend/.env` with your actual values:
+```env
+# Database
 DB_HOST=localhost
 DB_PORT=5432
-DB_NAME=spoonfeeder
+DB_NAME=spoon_edu
 DB_USER=postgres
-DB_PASSWORD=your_postgres_password
-````
-### Start Backend Server
+DB_PASSWORD=your_password
 
+# JWT Secret (generate a secure key)
+JWT_SECRET=your-secure-jwt-secret-here
+
+# Supabase (optional - for file storage)
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+
+# Email (optional - for password reset)
+EMAIL_USER=your-email@gmail.com
+EMAIL_PASS=your-app-password
+```
+
+### 4. Initialize Database Schema
+```bash
+# Connect to PostgreSQL and run:
+psql -U postgres -d spoon_edu -f backend/src/db/schema.sql
+```
+
+### 5. Start the Application
+
+#### Option A: Start Both Frontend & Backend Together
 ```bash
 npm run dev
 ```
-### Server runs at: http://localhost:5000
 
----
+#### Option B: Start Separately
+```bash
+# Terminal 1 - Backend
+npm run dev:backend
 
-## Frontend Setup
+# Terminal 2 - Frontend
+npm run dev:frontend
+```
+
+### 6. Access the Application
+- **Frontend**: http://localhost:5173
+- **Backend API**: http://localhost:5000/api
+
+### 7. Test Accounts
+After running the setup script, you can login with:
+- **Email**: admin@spoon.edu
+- **Password**: password123
+
+The database is pre-seeded with sample colleges, departments, courses, topics, and content.
+
+## 📁 Project Structure
+
+```
+spoon-edu-platform/
+├── frontend/               # React frontend
+│   ├── src/
+│   │   ├── api/           # API client configurations
+│   │   ├── components/    # Reusable UI components
+│   │   ├── context/       # React context providers
+│   │   ├── pages/         # Page components
+│   │   └── lib/           # Utility libraries
+│   ├── package.json
+│   └── vite.config.ts
+├── backend/                # Node.js backend
+│   ├── src/
+│   │   ├── controllers/   # Route controllers
+│   │   ├── db/           # Database connection & schema
+│   │   ├── middleware/    # Express middleware
+│   │   ├── routes/        # API routes
+│   │   └── server.ts      # Server entry point
+│   ├── package.json
+│   └── .env               # Environment variables
+├── package.json           # Root package.json
+└── setup-backend.sh       # Setup script
+```
+
+## 🔧 API Endpoints
+
+### Authentication
+- `POST /api/auth/register` - User registration
+- `POST /api/auth/login` - User login
+- `POST /api/auth/forgot-password` - Request password reset
+- `POST /api/auth/reset-password/:token` - Reset password
+
+### Educational Content (Protected Routes)
+- `GET /api/colleges` - Get all colleges
+- `GET /api/departments` - Get departments for user's college
+- `GET /api/semesters` - Get semesters for user's department
+- `GET /api/courses` - Get courses for user's semester
+- `GET /api/topics` - Get topics for user's course
+- `GET /api/subtopics/:topicId` - Get subtopics for a topic
+- `GET /api/subtopics/:subtopicId/content` - Get content for a subtopic
+
+## 🔒 Authentication
+
+The application uses JWT tokens for authentication. Include the token in the Authorization header:
+
+```
+Authorization: Bearer <your-jwt-token>
+```
+
+Tokens are automatically included in requests via the API interceptor.
+
+## 📊 Data Hierarchy
+
+The educational content follows this hierarchy:
+```
+Colleges → Departments → Semesters → Courses → Topics → Subtopics → Content
+```
+
+### Sample Data Structure:
+- **5 Colleges**: Engineering, Science, Arts, Commerce, Medicine
+- **12 Departments**: Computer Science, Electrical Engineering, etc.
+- **24 Courses**: Programming, Data Structures, Algorithms, etc.
+- **16 Topics**: Programming Fundamentals, Variables, etc.
+- **16 Subtopics**: Hello World Program, Basic Syntax, etc.
+- **Sample Content**: Videos, notes, questions, and resources
+
+## 🗄️ Database Schema
+
+The application uses PostgreSQL with the following main tables:
+- `users` - User accounts
+- `colleges` - Educational institutions
+- `departments` - Academic departments
+- `semesters` - Academic semesters
+- `courses` - Course subjects
+- `topics` - Learning topics
+- `subtopics` - Subtopics within topics
+- `subtopic_content` - Content for subtopics (videos, notes, etc.)
+
+## 🚀 Deployment
+
+### Frontend Deployment
 ```bash
 cd frontend
-npm install
-npm start
+npm run build
+# Deploy the dist/ folder to your hosting service
 ```
 
-### App runs at: http://localhost:3000
-
----
-
-# API Endpoints
-## Authentication (Public) 
-#### Register  --- POST ---  /api/auth/register
-#### Login --- POST --- /api/auth/login
+### Backend Deployment
 ```bash
-{
-  "email": "user@example.com",
-  "password": "password123"
-}
-```
-##### Response:
-```bash
-{
-  "message": "Login successful",
-  "user": {
-    "id": 1,
-    "email": "user@example.com"
-  },
-  "token": "JWT_TOKEN"
-}
+cd backend
+npm run build  # If using TypeScript compilation
+# Deploy to your server (Heroku, Railway, Vercel, etc.)
 ```
 
-# Academic Hierarchy (Protected)
+## 🛠️ Development Scripts
 
-## Authorization
-
-All endpoints require the following header:
-
-    Authorization: Bearer <JWT_TOKEN>
-
-## API Endpoints
-
-Entity    ---    GET Endpoint (Fetch by Parent)  ---  POST Endpoint\
-
-Colleges   ---   `/api/colleges`        ---           `/api/colleges`\
-Departments ---  `/api/departments?collegeId=1` ---   `/api/departments`\
-Semesters  ---   `/api/semesters?departmentId=1` ---  `/api/semesters`\
-Courses   ---    `/api/courses?semesterId=1` ---      `/api/courses`\
-Topics    ---    `/api/topics?courseId=1`   ---       `/api/topics`\
-Subtopics  ---   `/api/subtopics?topicId=1`  ---      `/api/subtopics`
-
-
-## Database Schema
-
-### Tables
-
--   users
--   colleges
--   departments
--   semesters
--   courses
--   topics
--   subtopics
-
-All relationships use foreign keys with `ON DELETE CASCADE`.
-
-## Current Status
-
-### Backend
-
--   Full academic hierarchy (6 levels)
--   Authentication and JWT
--   Protected routes
--   PostgreSQL integration
--   Data persistence
--   Secure password hashing
+### Root Level
+- `npm run dev` - Start both frontend and backend
+- `npm run dev:frontend` - Start only frontend
+- `npm run dev:backend` - Start only backend
+- `npm run build` - Build frontend for production
 
 ### Frontend
-
--   Login page
--   Register page (pending)
--   Hierarchy navigation (pending)
--   Content viewing (pending)
--   Study modes (pending)
--   AI panel (pending)
-
-## Planned Features
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run preview` - Preview production build
 
 ### Backend
+- `npm run dev` - Start with nodemon (auto-restart)
 
--   Learning content system
--   User progress tracking
--   File uploads (PDF, PPT)
--   Study mode logic
--   Admin and teacher roles
+## 🤝 Contributing
 
-### Frontend
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
 
--   Full authentication flow
--   Academic navigation UI
--   Video player
--   PDF and PPT viewer
--   Q&A interface
--   AI support panel
+## 📄 License
 
-## Security Features
-
--   Password hashing (bcryptjs)
--   JWT authentication
--   Protected routes
--   Environment-based secrets
--   SQL injection prevention
--   CORS configuration
-
-## Testing
-
-### Register
-
-``` bash
-curl -X POST http://localhost:5000/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test@example.com","password":"test123"}'
-```
-
-### Login
-
-``` bash
-curl -X POST http://localhost:5000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test@example.com","password":"test123"}'
-```
-
-## Contributing
-
-This is a learning-focused project.\
-Suggestions and contributions are welcome.
-
-## License
-
-ISC
-
-## Author
-
-Suganth
+ISC License
