@@ -9,149 +9,230 @@
 
 .college-department-card {
   width: 100%;
-  max-width: 500px;
+  max-width: 600px;
   background-color: var(--card-background, #1A1A1C);
   border: 1px solid var(--border-subtle, #26262A);
-  border-radius: 12px;
+  border-radius: 16px;
   padding: 40px;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  position: relative;
 }
 
-.college-department-header {
+/* Step Indicator */
+.step-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24px;
+  position: relative;
+}
+
+.step-dot {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: var(--border-subtle, #26262A);
+  color: var(--text-secondary, #9CA3AF);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  z-index: 2;
+}
+
+.step-dot.active {
+  background-color: var(--primary-accent, #2563EB);
+  color: white;
+}
+
+.step-line {
+  width: 80px;
+  height: 2px;
+  background-color: var(--border-subtle, #26262A);
+  margin: 0 16px;
+  transition: background-color 0.3s ease;
+}
+
+.step-line.active {
+  background-color: var(--primary-accent, #2563EB);
+}
+
+/* Step Labels */
+.step-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 40px;
+  padding: 0 32px;
+}
+
+.step-labels span {
+  font-size: 12px;
+  color: var(--text-secondary, #9CA3AF);
+  font-weight: 500;
+  transition: color 0.3s ease;
+}
+
+.step-labels span.active {
+  color: var(--primary-accent, #2563EB);
+}
+
+/* Step Content */
+.step-content {
+  animation: fadeInUp 0.5s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.step-header {
   text-align: center;
   margin-bottom: 32px;
+  position: relative;
 }
 
-.college-department-header h1 {
-  font-size: 28px;
+.step-nav {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.back-button {
+  background: none;
+  border: none;
+  color: var(--text-secondary, #9CA3AF);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.back-button:hover {
+  background-color: var(--border-subtle, #26262A);
+  color: var(--text-primary, #c4c7cc);
+}
+
+.step-header h2 {
+  font-size: 24px;
   font-weight: 600;
   color: var(--text-primary, #c4c7cc);
   margin-bottom: 8px;
 }
 
-.college-department-header p {
+.step-header p {
   font-size: 14px;
   color: var(--text-secondary, #9CA3AF);
 }
 
-.college-department-form {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+/* Selection Grid */
+.selection-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-top: 24px;
 }
 
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.selection-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+  border: 1px solid var(--border-subtle, #26262A);
+  border-radius: 12px;
+  padding: 24px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
 }
 
-.form-group label {
-  font-size: 14px;
+.selection-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(37, 99, 235, 0.1), transparent);
+  transition: left 0.5s ease;
+}
+
+.selection-card:hover::before {
+  left: 100%;
+}
+
+.selection-card:hover {
+  border-color: var(--primary-accent, #2563EB);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.2);
+}
+
+.selection-card h3 {
+  font-size: 16px;
   font-weight: 500;
   color: var(--text-primary, #c4c7cc);
+  margin: 0;
+  transition: color 0.3s ease;
 }
 
-.form-select {
-  width: 100%;
-  padding: 12px 16px;
-  background-color: var(--background-dark, #0E0E10);
-  border: 1px solid var(--border-subtle, #26262A);
-  border-radius: 8px;
-  color: var(--text-primary, #c4c7cc);
-  font-size: 14px;
-  transition: all 0.2s ease;
-  outline: none;
-  cursor: pointer;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23c4c7cc' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 12px center;
-  padding-right: 36px;
+.selection-card:hover h3 {
+  color: var(--primary-accent, #2563EB);
 }
 
-.form-select option {
-  background-color: #1A1A1C;
-  color: #c4c7cc;
-}
-
-.form-select:focus {
-  border-color: var(--primary-accent, #2563EB);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-}
-
-.form-select:hover:not(:focus) {
-  border-color: #3A3A3E;
+/* Loading and Error States */
+.loading {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 40px;
+  color: var(--text-secondary, #9CA3AF);
+  font-size: 16px;
 }
 
 .error-message {
-  padding: 12px 16px;
   background-color: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  padding: 12px 16px;
   border-radius: 8px;
-  color: #FCA5A5;
-  font-size: 14px;
+  margin-bottom: 20px;
   text-align: center;
-}
-
-.submit-button {
-  width: 100%;
-  padding: 12px 24px;
-  background-color: var(--primary-accent, #2563EB);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  margin-top: 8px;
-}
-
-.submit-button:hover:not(:disabled) {
-  background-color: #1D4ED8;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
-}
-
-.submit-button:active:not(:disabled) {
-  transform: translateY(0);
-}
-
-.submit-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.college-department-footer {
-  margin-top: 24px;
-  text-align: center;
-}
-
-.college-department-footer p {
   font-size: 14px;
-  color: var(--text-secondary, #9CA3AF);
 }
 
-.footer-link {
-  color: var(--primary-accent, #2563EB);
-  font-weight: 500;
-  text-decoration: none;
-  transition: color 0.2s ease;
-}
-
-.footer-link:hover {
-  color: #3B82F6;
-  text-decoration: underline;
-}
-
-/* Responsive */
-@media (max-width: 480px) {
+/* Responsive Design */
+@media (max-width: 640px) {
   .college-department-card {
-    padding: 32px 24px;
+    padding: 24px;
+    margin: 16px;
   }
 
-  .college-department-header h1 {
-    font-size: 24px;
+  .selection-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .step-labels {
+    padding: 0 16px;
+  }
+
+  .step-line {
+    width: 40px;
+    margin: 0 8px;
+  }
+
+  .selection-card {
+    padding: 20px 16px;
+  }
+
+  .step-header h2 {
+    font-size: 20px;
   }
 }

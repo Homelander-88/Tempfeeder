@@ -44,3 +44,46 @@ ul {
 h1, h2, h3, h4, h5, h6 {
   margin: 0;
 }
+
+/* Disable text selection and blinking cursor for page content */
+* {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  cursor: default;
+}
+
+/* Allow text selection in input fields and textareas */
+input,
+textarea,
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="search"],
+input[type="tel"],
+input[type="url"],
+input[type="number"],
+[contenteditable="true"] {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+  cursor: text;
+}
+
+/* Allow text selection in buttons and links for accessibility */
+button,
+a {
+  cursor: pointer;
+}
+
+/* Allow text selection in elements that should be selectable */
+.selectable,
+.selectable * {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+  cursor: text;
+}

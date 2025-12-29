@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import './Header.css';
+import { useAuth } from '../../context/AuthContext';
 
 interface HeaderProps {
   onMenuToggle?: () => void;
@@ -13,10 +14,21 @@ interface HeaderProps {
 const Header: React.FC<HeaderProps> = ({
   onMenuToggle,
   onLogout,
-  username = "User",
-  email = "user@example.com",
+  username: usernameProp,
+  email: emailProp,
   onModeChange
 }) => {
+  const { user, logout: authLogout } = useAuth();
+  
+  // Use actual user data from AuthContext, fallback to props if provided
+  const email = user?.email || emailProp || "user@example.com";
+  const username = usernameProp || (email ? email.split('@')[0] : "User");
+  
+  const handleLogout = () => {
+    setShowProfileDropdown(false);
+    authLogout();
+    if (onLogout) onLogout();
+  };
   // Profile dropdown
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const [showShortcutTooltip, setShowShortcutTooltip] = useState(false);
@@ -42,11 +54,6 @@ const Header: React.FC<HeaderProps> = ({
 
 
 
-  // Logout
-  const handleLogout = () => {
-    setShowProfileDropdown(false);
-    if (onLogout) onLogout();
-  };
 
   // Handle menu toggle tooltip
   const handleMenuToggleHover = () => {
@@ -160,7 +167,7 @@ const Header: React.FC<HeaderProps> = ({
             }}
             aria-label="User menu"
           >
-            <span>{username.charAt(0).toUpperCase()}</span>
+            <span>{(username || email).charAt(0).toUpperCase()}</span>
           </button>
 
           {showProfileDropdown && (
@@ -188,6 +195,20 @@ const Header: React.FC<HeaderProps> = ({
               </button>
               <div className="profile-divider"></div>
               <button className="logout-btn" onClick={handleLogout}>
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
                 Sign out
               </button>
             </div>

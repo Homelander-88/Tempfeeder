@@ -170,6 +170,8 @@
     display: flex;
     flex-direction: column;
     justify-content: center;
+    will-change: contents;
+    transform: translateZ(0);
   }
   
   .right-panel p {
@@ -187,6 +189,8 @@
     margin-bottom: 20px;
     font-size: 14px;
     outline: none;
+    caret-color: var(--primary-accent);
+    caret-shape: block;
   }
   
   .right-panel input::placeholder {
@@ -195,6 +199,55 @@
   
   .right-panel input:focus {
     border-color: var(--primary-accent);
+  }
+  
+
+  /* Prevent autofill from changing input colors - Use actual hex values, not CSS variables */
+  .right-panel input:-webkit-autofill,
+  .right-panel input:-webkit-autofill:hover,
+  .right-panel input:-webkit-autofill:focus,
+  .right-panel input:-webkit-autofill:active,
+  .right-panel input[type="email"]:-webkit-autofill,
+  .right-panel input[type="email"]:-webkit-autofill:hover,
+  .right-panel input[type="email"]:-webkit-autofill:focus,
+  .right-panel input[type="email"]:-webkit-autofill:active,
+  .right-panel input[type="password"]:-webkit-autofill,
+  .right-panel input[type="password"]:-webkit-autofill:hover,
+  .right-panel input[type="password"]:-webkit-autofill:focus,
+  .right-panel input[type="password"]:-webkit-autofill:active,
+  .login-card input:-webkit-autofill,
+  .login-card input:-webkit-autofill:hover,
+  .login-card input:-webkit-autofill:focus,
+  .login-card input:-webkit-autofill:active,
+  .login-card input[type="email"]:-webkit-autofill,
+  .login-card input[type="email"]:-webkit-autofill:hover,
+  .login-card input[type="email"]:-webkit-autofill:focus,
+  .login-card input[type="email"]:-webkit-autofill:active,
+  .login-card input[type="password"]:-webkit-autofill,
+  .login-card input[type="password"]:-webkit-autofill:hover,
+  .login-card input[type="password"]:-webkit-autofill:focus,
+  .login-card input[type="password"]:-webkit-autofill:active {
+    -webkit-text-fill-color: #c4c7cc !important;
+    -webkit-box-shadow: 0 0 0px 1000px #1A1A1C inset !important;
+    box-shadow: 0 0 0px 1000px #1A1A1C inset !important;
+    background-color: #1A1A1C !important;
+    background: #1A1A1C !important;
+    color: #c4c7cc !important;
+    transition: background-color 5000s ease-in-out 0s, color 5000s ease-in-out 0s, background 5000s ease-in-out 0s !important;
+    -webkit-transition: background-color 5000s ease-in-out 0s, color 5000s ease-in-out 0s !important;
+  }
+  
+  /* Firefox autofill */
+  .right-panel input:-moz-autofill,
+  .right-panel input[type="email"]:-moz-autofill,
+  .right-panel input[type="password"]:-moz-autofill,
+  .login-card input:-moz-autofill,
+  .login-card input[type="email"]:-moz-autofill,
+  .login-card input[type="password"]:-moz-autofill {
+    background-color: #1A1A1C !important;
+    background: #1A1A1C !important;
+    color: #c4c7cc !important;
+    background-image: none !important;
   }
   
   .forgot {
@@ -293,6 +346,10 @@
     max-width: 460px;
     display: flex;
     flex-direction: column;
+    will-change: transform, opacity;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
   }
   
   .login-card h2 {
@@ -399,6 +456,28 @@
     flex: 1;
     padding-right: 50px;
   }
+
+  /* Prevent autofill colors for password wrapper inputs */
+  .password-wrapper input:-webkit-autofill,
+  .password-wrapper input:-webkit-autofill:hover,
+  .password-wrapper input:-webkit-autofill:focus,
+  .password-wrapper input:-webkit-autofill:active {
+    -webkit-text-fill-color: #c4c7cc !important;
+    -webkit-box-shadow: 0 0 0px 1000px #1A1A1C inset !important;
+    box-shadow: 0 0 0px 1000px #1A1A1C inset !important;
+    background-color: #1A1A1C !important;
+    background: #1A1A1C !important;
+    color: #c4c7cc !important;
+    transition: background-color 5000s ease-in-out 0s, color 5000s ease-in-out 0s, background 5000s ease-in-out 0s !important;
+    -webkit-transition: background-color 5000s ease-in-out 0s, color 5000s ease-in-out 0s !important;
+  }
+
+  .password-wrapper input:-moz-autofill {
+    background-color: #1A1A1C !important;
+    background: #1A1A1C !important;
+    color: #c4c7cc !important;
+    background-image: none !important;
+  }
   
   .show-pwd {
     position: absolute;
@@ -492,3 +571,21 @@
   input[type="password"]::-webkit-clear-button {
       display: none !important;
   }
+
+.error-message {
+  color: #ef4444;
+  font-size: 0.9rem;
+  text-align: center;
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 8px;
+  animation: errorShake 0.5s ease-in-out;
+}
+
+@keyframes errorShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}

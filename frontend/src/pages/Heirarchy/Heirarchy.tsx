@@ -11,14 +11,13 @@ interface HeirarchyProps {
 
 const Heirarchy: React.FC<HeirarchyProps> = ({ onNavigateToLogin, onNavigateToContent }) => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const { hierarchy, topics, subtopics, selectedTopic, selectedSubtopic, loadTopics, setSelectedTopic, setSelectedSubtopic, loadSubtopics, loadContent } = useHierarchy();
+  const { hierarchy, topics, subtopics, selectedTopic, selectedSubtopic, setSelectedTopic, setSelectedSubtopic, loadSubtopics, loadContent } = useHierarchy();
   const [sidebarMode, setSidebarMode] = useState<'topics' | 'subtopics'>('topics');
 
+  // This component is no longer used - users go directly to ContentView
   useEffect(() => {
-    if (hierarchy) {
-      loadTopics();
-    }
-  }, [hierarchy, loadTopics]);
+    // Component disabled
+  }, []);
 
   const handleMenuToggle = () => {
     setSidebarCollapsed(!sidebarCollapsed);

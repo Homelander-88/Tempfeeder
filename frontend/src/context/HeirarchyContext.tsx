@@ -1,6 +1,9 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
-import api from '../api/api';
+import { getCourses } from '../api/courses';
+import { getTopics } from '../api/topics';
+import { getSemestersByNames } from '../api/semester';
+import { getSubtopics, getSubtopicContent } from '../api/subtopics';
 
 export interface HierarchyData {
   college: string;
@@ -15,6 +18,13 @@ export interface Topic {
   description?: string;
 }
 
+export interface Course {
+  id: string;
+  name: string;
+  label: string; // Add label for compatibility with Sidebar
+  semesterId?: string;
+}
+
 export interface Subtopic {
   id: string;
   name: string;
@@ -25,14 +35,18 @@ export interface Subtopic {
 
 interface HierarchyContextType {
   hierarchy: HierarchyData | null;
+  selectedCourse: Course | null;
   selectedTopic: Topic | null;
   selectedSubtopic: Subtopic | null;
+  courses: Course[];
   topics: Topic[];
   subtopics: Subtopic[];
   setHierarchy: (hierarchy: HierarchyData) => void;
+  setSelectedCourse: (course: Course | null) => void;
   setSelectedTopic: (topic: Topic | null) => void;
   setSelectedSubtopic: (subtopic: Subtopic | null) => void;
-  loadTopics: () => Promise<void>;
+  loadCourses: () => Promise<void>;
+  loadTopics: (courseId: string) => Promise<void>;
   loadSubtopics: (topicId: string) => Promise<void>;
   loadContent: (subtopicId: string) => Promise<any>;
 }
@@ -53,60 +67,168 @@ interface HierarchyProviderProps {
 
 export const HierarchyProvider: React.FC<HierarchyProviderProps> = ({ children }) => {
   const [hierarchy, setHierarchy] = useState<HierarchyData | null>(null);
+  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null);
   const [selectedSubtopic, setSelectedSubtopic] = useState<Subtopic | null>(null);
+  const [courses, setCourses] = useState<Course[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [subtopics, setSubtopics] = useState<Subtopic[]>([]);
 
   // Load hierarchy from localStorage on mount
   useEffect(() => {
     const savedHierarchy = localStorage.getItem('hierarchy');
+    console.log('HierarchyContext - Loading from localStorage:', savedHierarchy);
     if (savedHierarchy) {
-      setHierarchy(JSON.parse(savedHierarchy));
+      const parsed = JSON.parse(savedHierarchy);
+      console.log('HierarchyContext - Parsed hierarchy:', parsed);
+      console.log('HierarchyContext - Semester value:', parsed.semester);
+      setHierarchy(parsed);
     }
   }, []);
 
-  const loadTopics = async () => {
-    if (!hierarchy) return;
+  const loadCourses = useCallback(async () => {
+    if (!hierarchy) {
+      console.log('loadCourses - No hierarchy available');
+      return;
+    }
+
+    console.log('loadCourses - Current hierarchy:', hierarchy);
+    console.log('loadCourses - Semester value:', hierarchy.semester);
 
     try {
-      const response = await api.get('/topics', {
-        params: {
-          college: hierarchy.college,
-          department: hierarchy.department,
-          semester: hierarchy.semester
-        }
-      });
-      setTopics(response.data);
+      // First get the semester ID by name
+      console.log('loadCourses - Fetching semesters for:', { department: hierarchy.department, college: hierarchy.college });
+      const semesterResponse = await getSemestersByNames(hierarchy.department, hierarchy.college);
+      console.log('loadCourses - Available semesters:', semesterResponse.data);
+      console.log('loadCourses - Looking for semester:', hierarchy.semester);
+      
+      // Try exact match first
+      let semester = semesterResponse.data.find((sem: any) => sem.name === hierarchy.semester);
+      
+      // If not found, try case-insensitive match
+      if (!semester) {
+        semester = semesterResponse.data.find((sem: any) => 
+          sem.name.toLowerCase() === hierarchy.semester.toLowerCase()
+        );
+      }
+      
+      // If still not found, try partial match
+      if (!semester) {
+        semester = semesterResponse.data.find((sem: any) => 
+          sem.name.toLowerCase().includes(hierarchy.semester.toLowerCase()) ||
+          hierarchy.semester.toLowerCase().includes(sem.name.toLowerCase())
+        );
+      }
+      
+      console.log('loadCourses - Found semester:', semester);
+
+      if (semester) {
+        console.log('loadCourses - Fetching courses for semester ID:', semester.id);
+        const response = await getCourses(semester.id);
+        console.log('loadCourses - Courses received:', response.data);
+        
+        // Transform API response to include label field for Sidebar compatibility
+        const transformedCourses = response.data.map((course: any) => ({
+          ...course,
+          label: course.name || course.label,
+          id: course.id.toString()
+        }));
+        console.log('loadCourses - Setting courses:', transformedCourses);
+        setCourses(transformedCourses);
+      } else {
+        console.error('loadCourses - Semester not found. Available:', semesterResponse.data.map((s: any) => s.name));
+        setCourses([]);
+      }
+    } catch (error) {
+      console.error('loadCourses - Failed to load courses:', error);
+      setCourses([]);
+    }
+  }, [hierarchy]);
+
+  const loadTopics = async (courseId: string) => {
+    // Check sessionStorage cache first
+    try {
+      const cacheKey = `topics_cache_${courseId}`;
+      const cached = sessionStorage.getItem(cacheKey);
+      if (cached) {
+        const cachedTopics = JSON.parse(cached);
+        setTopics(cachedTopics);
+        return;
+      }
+    } catch (error) {
+      console.error('Error reading topics from cache:', error);
+    }
+
+    // If not in cache, fetch from API
+    try {
+      const response = await getTopics(parseInt(courseId));
+      // Transform API response to include label field for Sidebar compatibility
+      const transformedTopics = response.data.map((topic: any) => ({
+        ...topic,
+        label: topic.name || topic.label,
+        id: topic.id.toString()
+      }));
+      // Store in sessionStorage cache
+      try {
+        const cacheKey = `topics_cache_${courseId}`;
+        sessionStorage.setItem(cacheKey, JSON.stringify(transformedTopics));
+      } catch (error) {
+        console.error('Error writing topics to cache:', error);
+      }
+      setTopics(transformedTopics);
     } catch (error) {
       console.error('Failed to load topics:', error);
-      // Load topics based on user's college, department, and semester
-      // This should be replaced with actual API call
       setTopics([]);
     }
   };
 
   const loadSubtopics = async (topicId: string) => {
+    // Check sessionStorage cache first
     try {
-      const response = await api.get(`/subtopics/${topicId}`);
-      setSubtopics(response.data);
+      const cacheKey = `subtopics_cache_${topicId}`;
+      const cached = sessionStorage.getItem(cacheKey);
+      if (cached) {
+        const cachedSubtopics = JSON.parse(cached);
+        setSubtopics(cachedSubtopics);
+        return;
+      }
+    } catch (error) {
+      console.error('Error reading subtopics from cache:', error);
+    }
+
+    // If not in cache, fetch from API
+    try {
+      // Clear previous subtopics first
+      setSubtopics([]);
+      const response = await getSubtopics(parseInt(topicId));
+      // Transform API response to include label field for Sidebar compatibility
+      const transformedSubtopics = response.data.map((subtopic: any) => ({
+        ...subtopic,
+        label: subtopic.name || subtopic.label,
+        name: subtopic.name || subtopic.label,
+        id: subtopic.id.toString()
+      }));
+      // Store in sessionStorage cache
+      try {
+        const cacheKey = `subtopics_cache_${topicId}`;
+        sessionStorage.setItem(cacheKey, JSON.stringify(transformedSubtopics));
+      } catch (error) {
+        console.error('Error writing subtopics to cache:', error);
+      }
+      setSubtopics(transformedSubtopics);
     } catch (error) {
       console.error('Failed to load subtopics:', error);
-      // For now, set some mock data based on topic
-      const mockSubtopics: { [key: string]: Subtopic[] } = {
-        // This should be replaced with actual API call
-      };
-      setSubtopics(mockSubtopics[topicId] || []);
+      setSubtopics([]);
     }
   };
 
   const loadContent = async (subtopicId: string) => {
     try {
-      const response = await api.get(`/subtopicContent/${subtopicId}`);
+      const response = await getSubtopicContent(parseInt(subtopicId));
       return response.data;
     } catch (error) {
       console.error('Failed to load content:', error);
-      // Return empty content data - should be replaced with actual API call
+      // Return empty content data
       return {
         title: "",
         videos: [],
@@ -122,15 +244,28 @@ export const HierarchyProvider: React.FC<HierarchyProviderProps> = ({ children }
     localStorage.setItem('hierarchy', JSON.stringify(newHierarchy));
   };
 
+  // Load courses when hierarchy changes
+  useEffect(() => {
+    if (hierarchy) {
+      loadCourses();
+    } else {
+      setCourses([]);
+    }
+  }, [hierarchy, loadCourses]);
+
   const value: HierarchyContextType = {
     hierarchy,
+    selectedCourse,
     selectedTopic,
     selectedSubtopic,
+    courses,
     topics,
     subtopics,
     setHierarchy: handleSetHierarchy,
+    setSelectedCourse,
     setSelectedTopic,
     setSelectedSubtopic,
+    loadCourses,
     loadTopics,
     loadSubtopics,
     loadContent,

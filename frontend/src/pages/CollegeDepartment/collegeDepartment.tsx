@@ -1,143 +1,285 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './collegeDepartment.css';
+import { getColleges } from '../../api/colleges';
+import { getDepartmentsByCollegeName } from '../../api/department';
+import { getSemestersByNames } from '../../api/semester';
 
 interface CollegeDepartmentProps {
   onNavigateToContent: () => void;
 }
 
-interface FormData {
+interface HierarchyData {
   college: string;
   department: string;
   semester: string;
 }
 
+type Step = 'college' | 'department' | 'semester';
+
 const CollegeDepartment = ({ onNavigateToContent }: CollegeDepartmentProps) => {
-  const [formData, setFormData] = useState<FormData>({
+  const [currentStep, setCurrentStep] = useState<Step>('college');
+  const [hierarchy, setHierarchy] = useState<HierarchyData>({
     college: '',
     department: '',
     semester: '',
   });
 
-  const colleges = [
-    'College of Engineering',
-    'College of Science',
-    'College of Arts',
-    'College of Commerce',
-    'College of Medicine',
-  ];
+  const [colleges, setColleges] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<any[]>([]);
+  const [semesters, setSemesters] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string>('');
 
-  const departments = [
-    'Computer Science',
-    'Electrical Engineering',
-    'Mechanical Engineering',
-    'Civil Engineering',
-    'Information Technology',
-    'Physics',
-    'Chemistry',
-    'Biology',
-    'Mathematics',
-  ];
+  // Load colleges on component mount
+  useEffect(() => {
+    loadColleges();
+  }, []);
 
-  const semesters = [
-    '1st Semester',
-    '2nd Semester',
-    '3rd Semester',
-    '4th Semester',
-    '5th Semester',
-    '6th Semester',
-    '7th Semester',
-    '8th Semester',
-  ];
+  // Load departments when college is selected
+  useEffect(() => {
+    if (hierarchy.college) {
+      loadDepartments();
+    }
+  }, [hierarchy.college]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+  // Load semesters when department is selected
+  useEffect(() => {
+    if (hierarchy.department) {
+      loadSemesters();
+    }
+  }, [hierarchy.department]);
+
+  const loadColleges = async () => {
+    try {
+      setLoading(true);
+      const response = await getColleges();
+      setColleges(response.data);
+    } catch (err) {
+      console.error('Failed to load colleges:', err);
+      setError('Failed to load colleges');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const loadDepartments = async () => {
+    try {
+      setLoading(true);
+      const response = await getDepartmentsByCollegeName(hierarchy.college);
+      setDepartments(response.data);
+    } catch (err) {
+      console.error('Failed to load departments:', err);
+      setError('Failed to load departments');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    // Store the hierarchy details in localStorage (even if empty)
-    localStorage.setItem('hierarchy', JSON.stringify(formData));
+  const loadSemesters = async () => {
+    try {
+      setLoading(true);
+      const response = await getSemestersByNames(hierarchy.department, hierarchy.college);
+      setSemesters(response.data);
+    } catch (err) {
+      console.error('Failed to load semesters:', err);
+      setError('Failed to load semesters');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    // Navigate to content immediately
+  const handleSelection = (field: keyof HierarchyData, value: string) => {
+    const newHierarchy = {
+      ...hierarchy,
+      [field]: value,
+      // Clear subsequent fields when changing parent selection
+      ...(field === 'college' && { department: '', semester: '' }),
+      ...(field === 'department' && { semester: '' }),
+    };
+    
+    console.log('handleSelection - field:', field, 'value:', value);
+    console.log('handleSelection - newHierarchy:', newHierarchy);
+    
+    setHierarchy(newHierarchy);
+
+    // Move to next step
+    if (field === 'college') {
+      setCurrentStep('department');
+    } else if (field === 'department') {
+      setCurrentStep('semester');
+    } else if (field === 'semester') {
+      console.log('handleSelection - Semester selected, calling handleComplete');
+      console.log('handleSelection - newHierarchy.semester:', newHierarchy.semester);
+      // Pass the newHierarchy directly to ensure we have the latest value
+      handleComplete(newHierarchy);
+    }
+  };
+
+  const handleBack = () => {
+    if (currentStep === 'department') {
+      setCurrentStep('college');
+      setHierarchy(prev => ({ ...prev, department: '', semester: '' }));
+    } else if (currentStep === 'semester') {
+      setCurrentStep('department');
+      setHierarchy(prev => ({ ...prev, semester: '' }));
+    }
+  };
+
+  const handleComplete = (completedHierarchy?: HierarchyData) => {
+    console.log('handleComplete - received completedHierarchy:', completedHierarchy);
+    console.log('handleComplete - current hierarchy state:', hierarchy);
+    
+    const hierarchyToStore = completedHierarchy || hierarchy;
+    console.log('handleComplete - hierarchyToStore:', hierarchyToStore);
+    console.log('handleComplete - semester value:', hierarchyToStore.semester);
+    
+    // Validate that all required fields are present
+    if (!hierarchyToStore.college || !hierarchyToStore.department || !hierarchyToStore.semester) {
+      console.error('handleComplete - Missing required fields:', {
+        college: hierarchyToStore.college,
+        department: hierarchyToStore.department,
+        semester: hierarchyToStore.semester
+      });
+      alert('Please ensure all fields (college, department, semester) are selected');
+      return;
+    }
+    
+    // Store the hierarchy details in localStorage
+    const storedValue = JSON.stringify(hierarchyToStore);
+    console.log('handleComplete - storing to localStorage:', storedValue);
+    localStorage.setItem('hierarchy', storedValue);
+    
+    // Verify it was stored correctly
+    const verify = localStorage.getItem('hierarchy');
+    console.log('handleComplete - verified from localStorage:', verify);
+    if (verify) {
+      const parsed = JSON.parse(verify);
+      console.log('handleComplete - parsed hierarchy:', parsed);
+      console.log('handleComplete - parsed semester:', parsed.semester);
+      
+      if (!parsed.semester) {
+        console.error('handleComplete - ERROR: Semester was not stored correctly!');
+        alert('Error: Semester was not saved. Please try again.');
+        return;
+      }
+    }
+
+    // Navigate to content
     onNavigateToContent();
   };
+
+  const renderCollegeStep = () => (
+    <div className="step-content">
+      <div className="step-header">
+        <h2>Select Your College</h2>
+        <p>Choose the college you belong to</p>
+      </div>
+
+      {error && <div className="error-message">{error}</div>}
+
+      <div className="selection-grid">
+        {loading ? (
+          <div className="loading">Loading colleges...</div>
+        ) : (
+          colleges.map((college) => (
+            <button
+              key={college.id}
+              className="selection-card"
+              onClick={() => handleSelection('college', college.name)}
+            >
+              <h3>{college.name}</h3>
+            </button>
+          ))
+        )}
+      </div>
+    </div>
+  );
+
+  const renderDepartmentStep = () => (
+    <div className="step-content">
+      <div className="step-header">
+        <div className="step-nav">
+          <button className="back-button" onClick={handleBack}>← Back</button>
+        </div>
+        <h2>Select Your Department</h2>
+        <p>Choose your department in {hierarchy.college}</p>
+      </div>
+
+      {error && <div className="error-message">{error}</div>}
+
+      <div className="selection-grid">
+        {loading ? (
+          <div className="loading">Loading departments...</div>
+        ) : (
+          departments.map((department) => (
+            <button
+              key={department.id}
+              className="selection-card"
+              onClick={() => handleSelection('department', department.name)}
+            >
+              <h3>{department.name}</h3>
+            </button>
+          ))
+        )}
+      </div>
+    </div>
+  );
+
+  const renderSemesterStep = () => (
+    <div className="step-content">
+      <div className="step-header">
+        <div className="step-nav">
+          <button className="back-button" onClick={handleBack}>← Back</button>
+        </div>
+        <h2>Select Your Semester</h2>
+        <p>Choose your current semester in {hierarchy.department}</p>
+      </div>
+
+      {error && <div className="error-message">{error}</div>}
+
+      <div className="selection-grid">
+        {loading ? (
+          <div className="loading">Loading semesters...</div>
+        ) : semesters.length > 0 ? (
+          semesters.map((semester) => (
+            <button
+              key={semester.id}
+              className="selection-card"
+              onClick={() => handleSelection('semester', semester.name)}
+            >
+              <h3>{semester.name}</h3>
+            </button>
+          ))
+        ) : (
+          <div className="no-data">
+            <p>No semesters found for {hierarchy.department}</p>
+            <p>Available semesters in database may not match the department name.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div className="college-department-container">
       <div className="college-department-card">
-        <div className="college-department-header">
-          <h1>Select Your Details</h1>
-          <p>Choose your college, department, and semester</p>
+        <div className="step-indicator">
+          <div className={`step-dot ${currentStep === 'college' || currentStep === 'department' || currentStep === 'semester' ? 'active' : ''}`}>1</div>
+          <div className={`step-line ${currentStep === 'department' || currentStep === 'semester' ? 'active' : ''}`}></div>
+          <div className={`step-dot ${currentStep === 'department' || currentStep === 'semester' ? 'active' : ''}`}>2</div>
+          <div className={`step-line ${currentStep === 'semester' ? 'active' : ''}`}></div>
+          <div className={`step-dot ${currentStep === 'semester' ? 'active' : ''}`}>3</div>
         </div>
 
-        <form onSubmit={handleSubmit} className="college-department-form">
-          <div className="form-group">
-            <label htmlFor="college">College</label>
-            <select
-              id="college"
-              name="college"
-              value={formData.college}
-              onChange={handleChange}
-              className="form-select"
-            >
-              <option value="">Select College</option>
-              {colleges.map((college) => (
-                <option key={college} value={college}>
-                  {college}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div className="step-labels">
+          <span className={currentStep === 'college' ? 'active' : ''}>College</span>
+          <span className={currentStep === 'department' ? 'active' : ''}>Department</span>
+          <span className={currentStep === 'semester' ? 'active' : ''}>Semester</span>
+        </div>
 
-          <div className="form-group">
-            <label htmlFor="department">Department</label>
-            <select
-              id="department"
-              name="department"
-              value={formData.department}
-              onChange={handleChange}
-              className="form-select"
-            >
-              <option value="">Select Department</option>
-              {departments.map((dept) => (
-                <option key={dept} value={dept}>
-                  {dept}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="semester">Semester</label>
-            <select
-              id="semester"
-              name="semester"
-              value={formData.semester}
-              onChange={handleChange}
-              className="form-select"
-            >
-              <option value="">Select Semester</option>
-              {semesters.map((sem) => (
-                <option key={sem} value={sem}>
-                  {sem}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <button
-            type="submit"
-            className="submit-button"
-          >
-            Continue
-          </button>
-        </form>
-
+        {currentStep === 'college' && renderCollegeStep()}
+        {currentStep === 'department' && renderDepartmentStep()}
+        {currentStep === 'semester' && renderSemesterStep()}
       </div>
     </div>
   );

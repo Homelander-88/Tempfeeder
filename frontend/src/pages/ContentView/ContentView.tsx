@@ -17,69 +17,195 @@ const ContentView: React.FC<ContentViewProps> = ({ onNavigateToLogin, onNavigate
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [playingVideos, setPlayingVideos] = useState<{ [key: string]: boolean }>({});
   const [mode, setMode] = useState<"deep" | "normal" | "rush">("normal"); // initial mode
-  const { selectedSubtopic, hierarchy, selectedTopic, topics, subtopics, setSelectedTopic, setSelectedSubtopic, loadTopics, loadSubtopics, loadContent } = useHierarchy();
+  const { selectedSubtopic, hierarchy, selectedCourse, selectedTopic, courses, topics, subtopics, setSelectedCourse, setSelectedTopic, setSelectedSubtopic, loadTopics, loadSubtopics, loadContent, loadCourses, setHierarchy } = useHierarchy();
   const [contentData, setContentData] = useState<any>(null);
+  const [isLoadingCourses, setIsLoadingCourses] = useState(false);
+  const [isLoadingTopics, setIsLoadingTopics] = useState(false);
+  const [isLoadingSubtopics, setIsLoadingSubtopics] = useState(false);
+  
+  // Session-level content cache using sessionStorage
+  const getContentFromCache = (subtopicId: string): any | null => {
+    try {
+      const cacheKey = `content_cache_${subtopicId}`;
+      const cached = sessionStorage.getItem(cacheKey);
+      return cached ? JSON.parse(cached) : null;
+    } catch (error) {
+      console.error('Error reading from cache:', error);
+      return null;
+    }
+  };
+
+  const setContentInCache = (subtopicId: string, content: any) => {
+    try {
+      const cacheKey = `content_cache_${subtopicId}`;
+      sessionStorage.setItem(cacheKey, JSON.stringify(content));
+    } catch (error) {
+      console.error('Error writing to cache:', error);
+    }
+  };
 
   const notesRef = useRef<HTMLDivElement>(null);
   const [showToolbar, setShowToolbar] = useState(false);
   const [toolbarPos, setToolbarPos] = useState({ x: 0, y: 0 });
 
+  // Ensure hierarchy is loaded from localStorage if context doesn't have it
   useEffect(() => {
-    // Load topics when component mounts or hierarchy changes
-    if (hierarchy) {
-      loadTopics();
+    if (!hierarchy) {
+      const savedHierarchy = localStorage.getItem('hierarchy');
+      if (savedHierarchy) {
+        const parsed = JSON.parse(savedHierarchy);
+        if (parsed.semester) {
+          setHierarchy(parsed);
+        }
+      }
     }
-  }, [hierarchy, loadTopics]);
+  }, [hierarchy, setHierarchy]);
+
+  // Ensure courses are loaded when component mounts
+  useEffect(() => {
+    if (hierarchy && courses.length === 0) {
+      setIsLoadingCourses(true);
+      loadCourses().finally(() => setIsLoadingCourses(false));
+    }
+  }, [hierarchy, courses.length, loadCourses]);
+
+  // Courses are loaded automatically in HierarchyContext when hierarchy changes
+  // No need for additional loading here
 
   useEffect(() => {
-    // Load content when component mounts (content should already be loaded when navigating here)
+    // Load content when selectedSubtopic changes
     if (selectedSubtopic) {
-      // For now, set mock content based on subtopic
-      const mockContent = {
-        title: selectedSubtopic.name,
-        featuredVideo: {
-          title: `Introduction to ${selectedSubtopic.name}`,
-          youtubeUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-        },
-        videos: [
-          {
-            title: `Tutorial: ${selectedSubtopic.name} Basics`,
-            youtubeUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-          },
-          {
-            title: `Advanced ${selectedSubtopic.name} Concepts`,
-            youtubeUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-          }
-        ],
-        driveResources: [
-          {
-            title: "Study Materials & Notes",
-            url: "https://drive.google.com/file/d/example/preview"
-          },
-          {
-            title: "Practice Problems",
-            url: "https://drive.google.com/file/d/example/preview"
-          }
-        ],
-        notes: `Detailed notes for ${selectedSubtopic.name}. This section contains comprehensive information about the topic, including key concepts, definitions, and important points to remember.`,
-        questions: [
-          {
-            question: `What are the fundamental concepts of ${selectedSubtopic.name}?`,
-            answer: "The fundamental concepts include basic definitions, core principles, and essential terminology that form the foundation of this topic."
-          },
-          {
-            question: `How does ${selectedSubtopic.name} relate to ${selectedTopic?.name}?`,
-            answer: `${selectedSubtopic.name} is a specific subtopic within ${selectedTopic?.name} that focuses on particular aspects and applications of the broader subject area.`
-          },
-          {
-            question: "What are the common challenges when learning this topic?",
-            answer: "Common challenges include understanding complex relationships, applying concepts to real-world scenarios, and mastering practical implementation techniques."
-          }
-        ]
-      };
+      loadContentData();
+    } else {
+      setContentData(null);
+    }
+  }, [selectedSubtopic]);
+
+  const loadContentData = async () => {
+    if (!selectedSubtopic) return;
+
+    const subtopicId = selectedSubtopic.id.toString();
+    
+    // Check sessionStorage cache first
+    const cachedContent = getContentFromCache(subtopicId);
+    if (cachedContent) {
+      setContentData(cachedContent);
+      return;
+    }
+
+    // If not in cache, fetch from API
+    try {
+      const content = await loadContent(subtopicId);
+      if (content && Array.isArray(content) && content.length > 0) {
+        // Transform the backend content format to frontend format
+        const transformedContent = transformContentData(content);
+        // Store in sessionStorage cache
+        setContentInCache(subtopicId, transformedContent);
+        setContentData(transformedContent);
+      } else {
+        // Fallback to mock content if no real content exists
+        const mockContent = getMockContent();
+        setContentInCache(subtopicId, mockContent);
+        setContentData(mockContent);
+      }
+    } catch (error) {
+      // On error, use mock content and cache it
+      const mockContent = getMockContent();
+      setContentInCache(subtopicId, mockContent);
       setContentData(mockContent);
     }
-  }, [selectedSubtopic, selectedTopic]);
+  };
+
+  const transformContentData = (backendContent: any[]) => {
+    // Transform backend content array to frontend format
+    const contentMap: { [key: string]: any[] } = {
+      videos: [],
+      driveResources: [],
+      notes: [],
+      questions: []
+    };
+
+    backendContent.forEach(item => {
+      // Handle both content_type and contentType (backend may use either)
+      const contentType = item.content_type || item.contentType;
+      
+      switch (contentType) {
+        case 'video':
+          if (item.content && (item.content.includes('youtube.com') || item.content.includes('youtu.be'))) {
+            contentMap.videos.push({
+              title: item.title || 'Video Content',
+              youtubeUrl: item.content
+            });
+          }
+          break;
+        case 'drive':
+          contentMap.driveResources.push({
+            title: item.title || 'Drive Resource',
+            url: item.content
+          });
+          break;
+        case 'notes':
+          if (item.content) {
+            contentMap.notes.push(item.content);
+          }
+          break;
+        case 'question':
+          contentMap.questions.push({
+            question: item.title || item.content || 'Question',
+            answer: item.metadata?.answer || item.metadata?.Answer || 'Answer not available'
+          });
+          break;
+      }
+    });
+
+    return {
+      title: selectedSubtopic?.name || 'Content',
+      featuredVideo: contentMap.videos[0] || null,
+      videos: contentMap.videos,
+      driveResources: contentMap.driveResources,
+      notes: contentMap.notes.join('\n\n'),
+      questions: contentMap.questions
+    };
+  };
+
+  const getMockContent = () => {
+    if (!selectedSubtopic) return null;
+
+    return {
+      title: selectedSubtopic.name,
+      featuredVideo: {
+        title: `Introduction to ${selectedSubtopic.name}`,
+        youtubeUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+      },
+      videos: [
+        {
+          title: `Tutorial: ${selectedSubtopic.name} Basics`,
+          youtubeUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        },
+        {
+          title: `Advanced ${selectedSubtopic.name} Concepts`,
+          youtubeUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        }
+      ],
+      driveResources: [
+        {
+          title: "Study Materials & Notes",
+          url: "https://drive.google.com/file/d/example/preview"
+        },
+        {
+          title: "Practice Problems",
+          url: "https://drive.google.com/file/d/example/preview"
+        }
+      ],
+      notes: `Detailed notes for ${selectedSubtopic.name}. This section contains comprehensive information about the topic, including key concepts, definitions, and important points to remember.`,
+      questions: [
+        {
+          question: `What are the fundamental concepts of ${selectedSubtopic.name}?`,
+          answer: "The fundamental concepts include basic definitions, core principles, and essential terminology that form the foundation of this topic."
+        },
+      ]
+    };
+  };
 
   const handleMenuToggle = () => setSidebarCollapsed(!sidebarCollapsed);
 
@@ -101,15 +227,46 @@ const ContentView: React.FC<ContentViewProps> = ({ onNavigateToLogin, onNavigate
     if (path === "/heirarchy") onNavigateToHeirarchy();
   };
 
+  const handleCourseClick = async (course: any) => {
+    setSelectedCourse(course);
+    setIsLoadingTopics(true);
+    try {
+      await loadTopics(course.id);
+    } finally {
+      setIsLoadingTopics(false);
+    }
+  };
+
   const handleTopicClick = async (topic: any) => {
+    // Clear previous subtopic selection and content
+    setSelectedSubtopic(null);
+    setContentData(null);
+    // Set the new topic and load its subtopics
     setSelectedTopic(topic);
-    await loadSubtopics(topic.id);
+    setIsLoadingSubtopics(true);
+    try {
+      await loadSubtopics(topic.id);
+    } finally {
+      setIsLoadingSubtopics(false);
+    }
+  };
+
+  const handleBackToCourses = () => {
+    setSelectedCourse(null);
+    setSelectedTopic(null);
+    setSelectedSubtopic(null);
+    setContentData(null);
+  };
+
+  const handleBackToTopics = () => {
+    setSelectedTopic(null);
+    setSelectedSubtopic(null);
+    setContentData(null);
   };
 
   const handleSubtopicClick = async (subtopic: any) => {
+    // Set the selected subtopic (this will trigger the useEffect to load content)
     setSelectedSubtopic(subtopic);
-    // Load content for the selected subtopic
-    await loadContent(subtopic.id);
   };
 
   const getYoutubeId = (url: string) => {
@@ -318,18 +475,48 @@ const ContentView: React.FC<ContentViewProps> = ({ onNavigateToLogin, onNavigate
       <Header onMenuToggle={handleMenuToggle} onNavigate={handleNavigate} onModeChange={setMode} />
       <Sidebar
         isCollapsed={sidebarCollapsed}
-        mode={selectedTopic ? "subtopics" : "topics"}
-        items={selectedTopic ? subtopics : topics}
-        onItemClick={selectedTopic ? handleSubtopicClick : handleTopicClick}
-        selectedItemId={selectedTopic ? (selectedSubtopic ? selectedSubtopic.id : selectedTopic.id) : undefined}
+        mode={
+          selectedTopic ? "subtopics" :
+          selectedCourse ? "topics" :
+          "courses"
+        }
+        items={
+          selectedTopic ? subtopics :
+          selectedCourse ? topics :
+          courses
+        }
+        onItemClick={
+          selectedTopic ? handleSubtopicClick :
+          selectedCourse ? handleTopicClick :
+          handleCourseClick
+        }
+        selectedItemId={
+          selectedTopic 
+            ? (selectedSubtopic ? selectedSubtopic.id : undefined)
+            : selectedCourse 
+              ? selectedCourse.id
+              : undefined
+        }
+        onBackClick={
+          selectedTopic ? handleBackToTopics :
+          selectedCourse ? handleBackToCourses :
+          undefined
+        }
+        topicName={selectedTopic ? selectedTopic.name : undefined}
+        courseName={selectedCourse ? selectedCourse.name : undefined}
+        isLoading={
+          (selectedTopic ? isLoadingSubtopics : 
+           selectedCourse ? isLoadingTopics : 
+           isLoadingCourses)
+        }
       />
       <div className={`content-main ${sidebarCollapsed ? "sidebar-collapsed" : ""} ${selectedSubtopic ? "scroll-enabled" : "scroll-disabled"}`}>
         {contentData && contentData.title && (
           <div className="content-header">
             <h1 className="fade-in">{contentData.title} <span style={{ fontSize: "0.8rem", color: "#888" }}>({mode.toUpperCase()} MODE)</span></h1>
-            {hierarchy && selectedTopic && selectedSubtopic && (
+            {hierarchy && selectedCourse && selectedTopic && selectedSubtopic && (
               <div className="content-breadcrumb">
-                <span>{hierarchy.college} → {hierarchy.department} → {hierarchy.semester} → {selectedTopic.name} → {selectedSubtopic.name}</span>
+                <span>{hierarchy.college} → {hierarchy.department} → {hierarchy.semester} → {selectedCourse.name} → {selectedTopic.name} → {selectedSubtopic.name}</span>
               </div>
             )}
           </div>
@@ -347,19 +534,23 @@ const ContentView: React.FC<ContentViewProps> = ({ onNavigateToLogin, onNavigate
                 <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
               </svg>
             </div>
-            <h2>Select a Topic to Start Learning</h2>
-            <p>Choose a topic from the sidebar to explore detailed content, videos, and practice questions.</p>
+            <h2>Select a Course to Start Learning</h2>
+            <p>Choose a course from the sidebar to explore topics and detailed content.</p>
             <div className="placeholder-steps">
               <div className="step">
                 <span className="step-number">1</span>
-                <span>Select a topic from the sidebar</span>
+                <span>Select a course from the sidebar</span>
               </div>
               <div className="step">
                 <span className="step-number">2</span>
-                <span>Choose a subtopic to dive deeper</span>
+                <span>Choose a topic to explore</span>
               </div>
               <div className="step">
                 <span className="step-number">3</span>
+                <span>Select a subtopic for content</span>
+              </div>
+              <div className="step">
+                <span className="step-number">4</span>
                 <span>Access videos, notes, and practice questions</span>
               </div>
             </div>

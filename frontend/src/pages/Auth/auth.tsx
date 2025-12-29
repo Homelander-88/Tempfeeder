@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "../../context/AuthContext";
 import "./auth.css";
 
 // Custom SVG Icons
@@ -60,9 +61,56 @@ interface LoginProps {
 }
 
 export default function Login({ onNavigateToContent, onNavigateToCollegeDepartment, initialMode = "login" }: LoginProps) {
+  const { login, register, isLoading } = useAuth();
   const [eye, setEye] = useState({ x: 0, y: 0 });
   const [mode, setMode] = useState<Mode>("normal");
   const [peekDoll, setPeekDoll] = useState<string | null>(null);
+  const [error, setError] = useState<string>("");
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+    confirmPassword: ""
+  });
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData(prev => ({
+      ...prev,
+      [e.target.name]: e.target.value
+    }));
+    setError("");
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    try {
+      await login(formData);
+      onNavigateToContent();
+    } catch (err: any) {
+      setError(err.response?.data?.error || "Login failed. Please try again.");
+    }
+  };
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    if (formData.password !== formData.confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+
+    try {
+      await register({
+        email: formData.email,
+        password: formData.password
+      });
+      onNavigateToCollegeDepartment();
+    } catch (err: any) {
+      setError(err.response?.data?.error || "Registration failed. Please try again.");
+    }
+  };
   const [showPwd, setShowPwd] = useState(false);
   const [enter, setEnter] = useState(false);
   const [fade, setFade] = useState(false);
@@ -101,6 +149,13 @@ export default function Login({ onNavigateToContent, onNavigateToCollegeDepartme
     };
   }, []);
 
+  // Re-trigger animations when switching between login and register
+  useEffect(() => {
+    setFade(false);
+    const timer = setTimeout(() => setFade(true), 50);
+    return () => clearTimeout(timer);
+  }, [authMode]);
+
   useEffect(() => {
     const moveEyes = (e: MouseEvent) => {
       const centerX = window.innerWidth / 2;
@@ -119,11 +174,6 @@ export default function Login({ onNavigateToContent, onNavigateToCollegeDepartme
     return () => window.removeEventListener("mousemove", moveEyes);
   }, []);
 
-  const handlePwdChange = () => {
-    // Eyes stay closed while password field is focused, regardless of typing
-    setMode("password");
-    setPeekDoll(null); // Clear any peek state when password field is focused
-  };
 
   const toggleShowPwd = () => {
     setShowPwd(prev => {
@@ -154,14 +204,15 @@ export default function Login({ onNavigateToContent, onNavigateToCollegeDepartme
         animate={authMode}
         initial="login"
       >
-        <AnimatePresence mode="wait">
+        <AnimatePresence mode="wait" initial={false}>
           {authMode === "login" ? (
             <motion.div
               key="login-text"
               initial={{ x: -50, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: 50, opacity: 0 }}
-              transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
+              transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
+              style={{ willChange: 'transform, opacity' }}
             >
               <div className="brand-title">Spoonfeeder</div>
               <div className="brand-hero">
@@ -176,9 +227,10 @@ export default function Login({ onNavigateToContent, onNavigateToCollegeDepartme
               initial={{ x: -50, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: 50, opacity: 0 }}
-              transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
+              transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
+              style={{ willChange: 'transform, opacity' }}
             >
-              <div className="brand-title">Join Us</div>
+              <div className="brand-title">Spoonfeeder</div>
               <div className="brand-hero">
                 Start your journey<br />
                 Create your account
@@ -206,22 +258,27 @@ export default function Login({ onNavigateToContent, onNavigateToCollegeDepartme
         animate={authMode}
         initial="login"
       >
-        <AnimatePresence mode="wait">
+        <AnimatePresence mode="wait" initial={false}>
           {authMode === "login" ? (
-            <motion.div
+            <motion.form
               key="login-form"
               className="login-card"
+              onSubmit={handleLogin}
               initial={{ x: -50, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: 50, opacity: 0 }}
-              transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
+              transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
+              style={{ willChange: 'transform, opacity' }}
             >
               <h2 className={fade ? "fade-in" : ""} style={{ animationDelay: "0.3s" }}>Welcome back</h2>
               <p className="subtitle" style={{ animationDelay: "0.4s" }}>Sign in to continue your learning journey</p>
 
               <input
                 type="email"
+                name="email"
                 placeholder="Email"
+                value={formData.email}
+                onChange={handleInputChange}
                 onFocus={() => setMode("email")}
                 onBlur={() => setMode("normal")}
                 className={fade ? "fade-in" : ""}
@@ -232,13 +289,15 @@ export default function Login({ onNavigateToContent, onNavigateToCollegeDepartme
                 <input
                   ref={passwordInputRef}
                   type={showPwd ? "text" : "password"}
+                  name="password"
                   placeholder="Password"
+                  value={formData.password}
+                  onChange={handleInputChange}
                   onFocus={() => {
                     setMode("password");
                     setPeekDoll(null);
                   }}
                   onBlur={() => setMode("normal")}
-                  onChange={handlePwdChange}
                 />
                 <span
                   className="show-pwd"
@@ -255,13 +314,19 @@ export default function Login({ onNavigateToContent, onNavigateToCollegeDepartme
               <div className={`forgot fade-in`} style={{ animationDelay: "0.7s" }}>Forgot password?</div>
 
               <button
-                type="button"
+                type="submit"
                 className="fade-in"
                 style={{ animationDelay: "0.8s" }}
-                onClick={onNavigateToContent}
+                disabled={isLoading}
               >
-                Sign in
+                {isLoading ? "Signing in..." : "Sign in"}
               </button>
+
+              {error && (
+                <div className="error-message fade-in" style={{ animationDelay: "0.7s" }}>
+                  {error}
+                </div>
+              )}
 
               <div className="signup fade-in" style={{ animationDelay: "0.9s" }}>
                 New to Spoonfeeder? <span onClick={() => setAuthMode("register")}>Create account</span>
@@ -297,36 +362,45 @@ export default function Login({ onNavigateToContent, onNavigateToCollegeDepartme
                   </a>
                 </div>
               </div>
-            </motion.div>
+            </motion.form>
           ) : (
-            <motion.div
+            <motion.form
               key="register-form"
               className="login-card"
+              onSubmit={handleRegister}
               initial={{ x: -50, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: 50, opacity: 0 }}
-              transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
+              transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
+              style={{ willChange: 'transform, opacity' }}
             >
-              <h2>Create Account</h2>
-              <p className="subtitle">Sign up to get started with SpoonFeeder</p>
+              <h2 className={fade ? "fade-in" : ""} style={{ animationDelay: "0.3s" }}>Create Account</h2>
+              <p className="subtitle" style={{ animationDelay: "0.4s" }}>Sign up to get started with SpoonFeeder</p>
 
               <input
                 type="email"
+                name="email"
                 placeholder="Email"
+                value={formData.email}
+                onChange={handleInputChange}
                 onFocus={() => setMode("email")}
                 onBlur={() => setMode("normal")}
+                className={fade ? "fade-in" : ""}
+                style={{ animationDelay: "0.5s" }}
               />
 
-              <div className="password-wrapper">
+              <div className="password-wrapper fade-in" style={{ animationDelay: "0.6s" }}>
                 <input
                   type={showPwd ? "text" : "password"}
+                  name="password"
                   placeholder="Password"
+                  value={formData.password}
+                  onChange={handleInputChange}
                   onFocus={() => {
                     setMode("password");
                     setPeekDoll(null);
                   }}
                   onBlur={() => setMode("normal")}
-                  onChange={handlePwdChange}
                 />
                 <span
                   className="show-pwd"
@@ -342,26 +416,39 @@ export default function Login({ onNavigateToContent, onNavigateToCollegeDepartme
 
               <input
                 type="password"
+                name="confirmPassword"
                 placeholder="Confirm Password"
+                value={formData.confirmPassword}
+                onChange={handleInputChange}
                 onFocus={() => {
                   setMode("password");
                   setPeekDoll(null);
                 }}
                 onBlur={() => setMode("normal")}
+                className={fade ? "fade-in" : ""}
+                style={{ animationDelay: "0.7s" }}
               />
 
               <button
-                type="button"
-                onClick={onNavigateToCollegeDepartment}
+                type="submit"
+                className="fade-in"
+                style={{ animationDelay: "0.8s" }}
+                disabled={isLoading}
               >
-                Create Account
+                {isLoading ? "Creating Account..." : "Create Account"}
               </button>
 
-              <div className="signup">
+              {error && (
+                <div className="error-message fade-in" style={{ animationDelay: "0.7s" }}>
+                  {error}
+                </div>
+              )}
+
+              <div className="signup fade-in" style={{ animationDelay: "0.9s" }}>
                 Already have an account? <span onClick={() => setAuthMode("login")}>Sign in</span>
               </div>
 
-              <div className="contact-section">
+              <div className="contact-section fade-in" style={{ animationDelay: "1s" }}>
                 <div className="contact-label">Contact us</div>
                 <div className="contact-icons">
                   <a
@@ -391,7 +478,7 @@ export default function Login({ onNavigateToContent, onNavigateToCollegeDepartme
                   </a>
                 </div>
               </div>
-            </motion.div>
+            </motion.form>
           )}
         </AnimatePresence>
       </motion.div>
