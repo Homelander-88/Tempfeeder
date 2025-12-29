@@ -1,10 +1,8 @@
 import { useState } from 'react';
-import api from '../../api/api';
 import './collegeDepartment.css';
 
 interface CollegeDepartmentProps {
   onNavigateToContent: () => void;
-  onNavigateToLogin: () => void;
 }
 
 interface FormData {
@@ -13,14 +11,12 @@ interface FormData {
   semester: string;
 }
 
-const CollegeDepartment = ({ onNavigateToContent, onNavigateToLogin }: CollegeDepartmentProps) => {
+const CollegeDepartment = ({ onNavigateToContent }: CollegeDepartmentProps) => {
   const [formData, setFormData] = useState<FormData>({
     college: '',
     department: '',
     semester: '',
   });
-  const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
 
   const colleges = [
     'College of Engineering',
@@ -59,45 +55,16 @@ const CollegeDepartment = ({ onNavigateToContent, onNavigateToLogin }: CollegeDe
       ...prev,
       [name]: value,
     }));
-    setError('');
   };
 
-  const validateForm = () => {
-    if (!formData.college || !formData.department || !formData.semester) {
-      setError('All fields are required');
-      return false;
-    }
-    return true;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
 
-    if (!validateForm()) {
-      return;
-    }
+    // Store the hierarchy details in localStorage (even if empty)
+    localStorage.setItem('hierarchy', JSON.stringify(formData));
 
-    setIsLoading(true);
-
-    try {
-      // Save the hierarchy details to backend via API
-      await api.post('/hierarchy', {
-        college: formData.college,
-        department: formData.department,
-        semester: formData.semester,
-      });
-
-      // Store the hierarchy details in localStorage as well
-      localStorage.setItem('hierarchy', JSON.stringify(formData));
-      
-      // Navigate to content
-      onNavigateToContent();
-    } catch (err) {
-      console.error('Failed to save hierarchy:', err);
-      setError('Failed to save details. Please try again.');
-      setIsLoading(false);
-    }
+    // Navigate to content immediately
+    onNavigateToContent();
   };
 
   return (
@@ -116,7 +83,6 @@ const CollegeDepartment = ({ onNavigateToContent, onNavigateToLogin }: CollegeDe
               name="college"
               value={formData.college}
               onChange={handleChange}
-              required
               className="form-select"
             >
               <option value="">Select College</option>
@@ -135,9 +101,7 @@ const CollegeDepartment = ({ onNavigateToContent, onNavigateToLogin }: CollegeDe
               name="department"
               value={formData.department}
               onChange={handleChange}
-              required
               className="form-select"
-              disabled={!formData.college}
             >
               <option value="">Select Department</option>
               {departments.map((dept) => (
@@ -155,9 +119,7 @@ const CollegeDepartment = ({ onNavigateToContent, onNavigateToLogin }: CollegeDe
               name="semester"
               value={formData.semester}
               onChange={handleChange}
-              required
               className="form-select"
-              disabled={!formData.department}
             >
               <option value="">Select Semester</option>
               {semesters.map((sem) => (
@@ -168,25 +130,14 @@ const CollegeDepartment = ({ onNavigateToContent, onNavigateToLogin }: CollegeDe
             </select>
           </div>
 
-          {error && <div className="error-message">{error}</div>}
-
           <button
             type="submit"
             className="submit-button"
-            disabled={isLoading}
           >
-            {isLoading ? 'Saving...' : 'Continue'}
+            Continue
           </button>
         </form>
 
-        <div className="college-department-footer">
-          <p>
-            Want to change later?{' '}
-            <a onClick={onNavigateToLogin} style={{ cursor: 'pointer' }} className="footer-link">
-              Log out
-            </a>
-          </p>
-        </div>
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
 .heirarchy-view {
   min-height: 100vh;
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-  color: white;
+  background: linear-gradient(135deg, #0E0E10 0%, #1A1A1C 100%);
+  color: #c4c7cc;
 }
 
 .heirarchy-main {
@@ -25,11 +25,12 @@
   font-size: 3rem;
   margin-bottom: 10px;
   font-weight: 700;
+  color: var(--text-primary);
 }
 
 .heirarchy-header p {
   font-size: 1.2rem;
-  opacity: 0.9;
+  color: var(--text-secondary);
 }
 
 .heirarchy-body {
@@ -38,23 +39,25 @@
 }
 
 .heirarchy-card {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.05), rgba(37, 99, 235, 0.02));
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-subtle);
   border-radius: 20px;
   padding: 40px;
   text-align: center;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
 }
 
 .heirarchy-card h2 {
   font-size: 2rem;
   margin-bottom: 20px;
+  color: var(--text-primary);
 }
 
 .heirarchy-card p {
   font-size: 1.1rem;
   margin-bottom: 30px;
-  opacity: 0.9;
+  color: var(--text-secondary);
 }
 
 .heirarchy-actions {
@@ -73,20 +76,45 @@
 }
 
 .heirarchy-actions button:first-child {
-  background: #f5576c;
+  background: linear-gradient(135deg, var(--primary-accent), var(--primary-accent-hover));
   color: white;
+  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.3);
 }
 
 .heirarchy-actions button:first-child:hover {
-  background: #e74c3c;
+  background: linear-gradient(135deg, var(--primary-accent-hover), var(--primary-accent));
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
 }
 
 .heirarchy-actions button:last-child {
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(37, 99, 235, 0.1);
+  color: #c4c7cc;
+  border: 1px solid var(--border-subtle);
+  backdrop-filter: blur(8px);
 }
 
 .heirarchy-actions button:last-child:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(37, 99, 235, 0.15);
+  border-color: var(--primary-accent);
+  color: var(--text-primary);
+}
+
+.hierarchy-info {
+  margin-top: 20px;
+  padding: 20px;
+  background: rgba(37, 99, 235, 0.05);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+}
+
+.hierarchy-info p {
+  margin: 8px 0;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.hierarchy-info strong {
+  color: var(--text-primary);
 }
