@@ -1,238 +1,201 @@
+:root {
+    --background-dark: #0E0E10;
+    --text-primary: #c4c7cc;
+    --text-secondary: #9CA3AF;
+    --primary-accent: #2563EB;
+    --border-subtle: #26262A;
+}
+
+/* 1. Container - Changed to flex-start to make top margin visible */
 .college-department-container {
-  min-height: 100vh;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 80px 24px; /* Large top padding creates the top margin */
+    background-color: var(--background-dark);
+    position: relative;
+    overflow-x: hidden;
+}
+
+/* 2. Back Button - Fixed positioning bugs */
+.back-button {
+  position: absolute;
+  /* 25% from top and 25% from left is the exact center of the top-left region */
+  top: 25%;
+  left: 25%;
+  /* Translate -50% ensures the center of the button sits on that 25% point */
+  transform: translate(-50%, -50%);
+
+  z-index: 1000;
+  cursor: pointer;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid var(--border-subtle);
+  color: var(--text-primary);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
-  background-color: var(--background-dark, #0E0E10);
+  transition: all 0.2s ease;
 }
 
+.back-button svg {
+  width: 22px;
+  height: 22px;
+}
+
+.back-button:hover {
+  background: var(--primary-accent);
+  border-color: var(--primary-accent);
+  color: white;
+  transform: translate(-50%, -50%) scale(1.1); /* Keep translate on hover */
+  box-shadow: 0 0 20px rgba(37, 99, 235, 0.4);
+}
+
+.back-button::before {
+    display: none;
+}
+
+/* 3. Main Card */
 .college-department-card {
-  width: 100%;
-  max-width: 600px;
-  background-color: var(--card-background, #1A1A1C);
-  border: 1px solid var(--border-subtle, #26262A);
-  border-radius: 16px;
-  padding: 40px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-  position: relative;
+    width: 100%;
+    max-width: 650px;
+    background-color: var(--background-dark);
+    padding: 20px; /* Reduced to match the tighter look in your image */
 }
 
-/* Step Indicator */
+/* 4. Step Indicator & Labels */
 .step-indicator {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 24px;
-  position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
 }
 
 .step-dot {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background-color: var(--border-subtle, #26262A);
-  color: var(--text-secondary, #9CA3AF);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  font-size: 14px;
-  transition: all 0.3s ease;
-  z-index: 2;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background-color: var(--border-subtle);
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 14px;
+    transition: 0.3s;
 }
 
 .step-dot.active {
-  background-color: var(--primary-accent, #2563EB);
-  color: white;
+    background-color: var(--primary-accent);
+    color: white;
+    box-shadow: 0 0 15px rgba(37, 99, 235, 0.4);
 }
 
 .step-line {
-  width: 80px;
-  height: 2px;
-  background-color: var(--border-subtle, #26262A);
-  margin: 0 16px;
-  transition: background-color 0.3s ease;
+    flex: 1;
+    height: 2px;
+    background-color: var(--border-subtle);
+    margin: 0 12px;
 }
 
 .step-line.active {
-  background-color: var(--primary-accent, #2563EB);
+    background-color: var(--primary-accent);
 }
 
-/* Step Labels */
 .step-labels {
   display: flex;
   justify-content: space-between;
   margin-bottom: 40px;
-  padding: 0 32px;
+  /* This padding must match the padding/margin of your .step-indicator */
+  padding: 0;
 }
 
 .step-labels span {
   font-size: 12px;
-  color: var(--text-secondary, #9CA3AF);
-  font-weight: 500;
-  transition: color 0.3s ease;
+  color: var(--text-secondary);
+  /* Match the width of the .step-dot (32px) for perfect centering */
+  width: 32px;
+  text-align: center;
+  display: flex;
+  justify-content: center;
+  white-space: nowrap;
 }
 
 .step-labels span.active {
-  color: var(--primary-accent, #2563EB);
+  color: var(--primary-accent);
+  font-weight: 600;
 }
 
-/* Step Content */
-.step-content {
-  animation: fadeInUp 0.5s ease-out;
-}
-
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
+/* 5. Header Section */
 .step-header {
-  text-align: center;
-  margin-bottom: 32px;
-  position: relative;
-}
-
-.step-nav {
-  position: absolute;
-  left: 0;
-  top: 0;
-}
-
-.back-button {
-  background: none;
-  border: none;
-  color: var(--text-secondary, #9CA3AF);
-  font-size: 14px;
-  cursor: pointer;
-  padding: 8px 12px;
-  border-radius: 8px;
-  transition: all 0.2s ease;
-}
-
-.back-button:hover {
-  background-color: var(--border-subtle, #26262A);
-  color: var(--text-primary, #c4c7cc);
+    text-align: center;
+    margin-bottom: 30px;
 }
 
 .step-header h2 {
-  font-size: 24px;
-  font-weight: 600;
-  color: var(--text-primary, #c4c7cc);
-  margin-bottom: 8px;
+    font-size: 28px;
+    font-weight: 700;
+    color: #FFFFFF;
+    margin-bottom: 10px;
 }
 
 .step-header p {
-  font-size: 14px;
-  color: var(--text-secondary, #9CA3AF);
+    font-size: 15px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
-/* Selection Grid */
+/* 6. Selection Grid & Card */
 .selection-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
-  margin-top: 24px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+    max-height: 450px;
+    overflow-y: auto;
+    padding: 4px;
+    scrollbar-width: none; /* Hide scrollbar for clean look */
+}
+
+.selection-grid::-webkit-scrollbar {
+    display: none;
 }
 
 .selection-card {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
-  border: 1px solid var(--border-subtle, #26262A);
-  border-radius: 12px;
-  padding: 24px 20px;
-  text-align: center;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
-}
-
-.selection-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(37, 99, 235, 0.1), transparent);
-  transition: left 0.5s ease;
-}
-
-.selection-card:hover::before {
-  left: 100%;
-}
-
-.selection-card:hover {
-  border-color: var(--primary-accent, #2563EB);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.2);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .selection-card h3 {
-  font-size: 16px;
-  font-weight: 500;
-  color: var(--text-primary, #c4c7cc);
-  margin: 0;
-  transition: color 0.3s ease;
+    font-size: 17px;
+    font-weight: 500;
+    color: #FFFFFF; /* Matches the blue text in your image */
 }
 
-.selection-card:hover h3 {
-  color: var(--primary-accent, #2563EB);
+.selection-card:hover {
+    background: rgba(37, 99, 235, 0.05);
+    border-color: var(--primary-accent);
+    transform: translateY(-2px);
+    box-shadow: 0 0 20px rgba(37, 99, 235, 0.15);
 }
 
-/* Loading and Error States */
-.loading {
-  grid-column: 1 / -1;
-  text-align: center;
-  padding: 40px;
-  color: var(--text-secondary, #9CA3AF);
-  font-size: 16px;
-}
-
-.error-message {
-  background-color: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.2);
-  color: #ef4444;
-  padding: 12px 16px;
-  border-radius: 8px;
-  margin-bottom: 20px;
-  text-align: center;
-  font-size: 14px;
-}
-
-/* Responsive Design */
-@media (max-width: 640px) {
-  .college-department-card {
-    padding: 24px;
-    margin: 16px;
+/* 7. Responsive Fixes */
+@media (max-width: 768px) {
+  .back-button {
+    /* On smaller screens, move it closer to the corner so it doesn't overlap card */
+    top: 10%;
+    left: 10%;
   }
 
-  .selection-grid {
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
-
-  .step-labels {
-    padding: 0 16px;
-  }
-
-  .step-line {
-    width: 40px;
-    margin: 0 8px;
-  }
-
-  .selection-card {
-    padding: 20px 16px;
-  }
-
-  .step-header h2 {
-    font-size: 20px;
-  }
+    .college-department-container {
+        padding-top: 40px;
+    }
 }

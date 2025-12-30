@@ -131,7 +131,6 @@ const CollegeDepartment = ({ onNavigateToContent }: CollegeDepartmentProps) => {
     <div className="step-content">
       <div className="step-header">
         <h2>Select Your College</h2>
-        <p>Choose the college you belong to</p>
       </div>
 
       {error && <div className="error-message">{error}</div>}
@@ -156,9 +155,10 @@ const CollegeDepartment = ({ onNavigateToContent }: CollegeDepartmentProps) => {
 
   const renderDepartmentStep = () => (
     <div className="step-content">
+
       <div className="step-header">
         <div className="step-nav">
-          <button className="back-button" onClick={handleBack}>← Back</button>
+
         </div>
         <h2>Select Your Department</h2>
         <p>Choose your department in {hierarchy.college}</p>
@@ -188,7 +188,6 @@ const CollegeDepartment = ({ onNavigateToContent }: CollegeDepartmentProps) => {
     <div className="step-content">
       <div className="step-header">
         <div className="step-nav">
-          <button className="back-button" onClick={handleBack}>← Back</button>
         </div>
         <h2>Select Your Semester</h2>
         <p>Choose your current semester in {hierarchy.department}</p>
@@ -221,6 +220,14 @@ const CollegeDepartment = ({ onNavigateToContent }: CollegeDepartmentProps) => {
 
   return (
     <div className="college-department-container">
+      {currentStep !== 'college' && (
+          <button className="back-button" onClick={handleBack} aria-label="Go back">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="19" y1="12" x2="5" y2="12"></line>
+              <polyline points="12 19 5 12 12 5"></polyline>
+            </svg>
+          </button>
+      )}
       <div className="college-department-card">
         <div className="step-indicator">
           <div className={`step-dot ${currentStep === 'college' || currentStep === 'department' || currentStep === 'semester' ? 'active' : ''}`}>1</div>

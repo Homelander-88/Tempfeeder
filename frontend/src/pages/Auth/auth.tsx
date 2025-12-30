@@ -79,7 +79,6 @@ function Login({onNavigateToContent, onNavigateToCollegeDepartment, initialMode 
   });
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setMode("normal");
     e.preventDefault();
     setFormData(prev => ({
       ...prev,
