@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 function AppContent() {
   const { isAuthenticated, isLoading } = useAuth();
   const [currentPage, setCurrentPage] = useState<"login" | "register" | "content" | "heirarchy" | "collegeDepartment">("login");
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Check if user has completed hierarchy setup
   const hasHierarchy = localStorage.getItem('hierarchy') !== null;
@@ -17,6 +18,10 @@ function AppContent() {
   const navigateToContent = () => setCurrentPage("content");
   const navigateToHeirarchy = () => setCurrentPage("heirarchy");
   const navigateToCollegeDepartment = () => setCurrentPage("collegeDepartment");
+
+  const toggleFullscreen = () => {
+    setIsFullscreen(!isFullscreen);
+  };
 
   // Determine initial page based on authentication and hierarchy status
   useEffect(() => {
@@ -61,10 +66,20 @@ function AppContent() {
       case "collegeDepartment":
         return <CollegeDepartment onNavigateToContent={navigateToContent} />;
       case "content":
-        return <ContentView onNavigateToLogin={navigateToLogin} onNavigateToHeirarchy={navigateToHeirarchy} />;
+        return <ContentView
+          onNavigateToLogin={navigateToLogin}
+          onNavigateToHeirarchy={navigateToHeirarchy}
+          isFullscreen={isFullscreen}
+          onFullscreenToggle={toggleFullscreen}
+        />;
       case "heirarchy":
         // Heirarchy component is no longer used - users go directly to ContentView
-        return <ContentView onNavigateToLogin={navigateToLogin} onNavigateToHeirarchy={navigateToHeirarchy} />;
+        return <ContentView
+          onNavigateToLogin={navigateToLogin}
+          onNavigateToHeirarchy={navigateToHeirarchy}
+          isFullscreen={isFullscreen}
+          onFullscreenToggle={toggleFullscreen}
+        />;
       default:
         return <Login onNavigateToRegister={navigateToRegister} onNavigateToContent={navigateToContent} onNavigateToHeirarchy={navigateToHeirarchy} onNavigateToCollegeDepartment={navigateToCollegeDepartment} />;
     }

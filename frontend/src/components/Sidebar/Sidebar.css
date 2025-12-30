@@ -184,11 +184,14 @@
   position: relative;
   font-size: 14px;
   font-weight: 500;
-  width: 100%;
+  width: 100%; /* Full width within sidebar-nav */
+  height: 48px; /* Fixed uniform height for all widgets */
   text-align: left;
   background: linear-gradient(135deg, rgba(26, 26, 28, 0.8), rgba(26, 26, 28, 0.6));
   border: 1px solid #26262A;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  box-sizing: border-box; /* Include padding in width calculations */
+  margin: 0; /* No additional margins */
 }
 
 .nav-link:hover {
@@ -345,8 +348,10 @@
 }
 
 .nav-link {
-  flex: 1;
-  margin-right: 40px; /* Space for delete button */
+  flex: none; /* Override flex for uniform sizing */
+  margin-right: 0; /* Remove margin for uniform sizing */
+  width: 100%; /* Ensure full width */
+  height: 48px; /* Maintain uniform height */
 }
 
 /* ===== Admin Add Button ===== */

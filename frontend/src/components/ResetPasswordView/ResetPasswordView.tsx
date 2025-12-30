@@ -2,12 +2,10 @@
 import {useState} from "react";
 import { motion} from "framer-motion";
 import './ResetPasswordView.css';
-import { useNavigate } from "react-router-dom";
 
 
 export function ResetPasswordView({ token, onComplete }: { token: string; onComplete: () => void; }) {
     const [password, setPassword] = useState("");
-    const navigate = useNavigate();
     const [confirm, setConfirm] = useState("");
     const [loading, setLoading] = useState(false);
     const [msg, setMsg] = useState<string | null>(null);
@@ -35,7 +33,7 @@ export function ResetPasswordView({ token, onComplete }: { token: string; onComp
             const j = await res.json();
             if (!res.ok) throw new Error(j?.error || "Failed to reset password");
             setMsg("Password reset successful. Redirecting to sign in...");
-            setTimeout(() => navigate("/login"), 1200);
+            setTimeout(() => onComplete(), 1200);
         } catch (e: any) {
             setErr(e?.message || "Server error");
         } finally {

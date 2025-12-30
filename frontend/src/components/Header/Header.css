@@ -367,40 +367,59 @@
 }
 
 .shortcut-tooltip {
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  margin-top: 8px;
-  background: #1A1A1C;
+  position: fixed;
+  background: rgba(26, 26, 28, 0.95);
   color: #D1D5DB;
-  padding: 6px 12px;
-  border-radius: 1.5px;
-  font-size: 12px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 11px;
   font-weight: 500;
   white-space: nowrap;
   box-shadow:
-    0 20px 40px rgba(0, 0, 0, 0.25),
-    0 8px 24px rgba(0, 0, 0, 0.15),
-    0 4px 12px rgba(0, 0, 0, 0.1),
-    0 2px 6px rgba(0, 0, 0, 0.08);
-  backdrop-filter: blur(12px);
-  border: 1px solid #26262A;
-  z-index: 1000;
-  animation: tooltipFadeIn 0.2s ease-out;
+    0 10px 25px rgba(0, 0, 0, 0.3),
+    0 4px 10px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(38, 38, 42, 0.5);
+  z-index: 10001;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(8px) scale(0.95);
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  max-width: 200px;
+  word-wrap: break-word;
+  text-align: center;
+  will-change: transform, opacity;
+}
+
+.shortcut-tooltip.visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.shortcut-tooltip::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 6px solid rgba(38, 38, 42, 0.5);
 }
 
 .shortcut-tooltip::after {
   content: '';
   position: absolute;
-  top: -4px;
+  top: -5px;
   left: 50%;
   transform: translateX(-50%);
   width: 0;
   height: 0;
-  border-left: 4px solid transparent;
-  border-right: 4px solid transparent;
-  border-bottom: 4px solid #1A1A1C;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 6px solid rgba(26, 26, 28, 0.95);
 }
 
 @keyframes tooltipFadeIn {
@@ -484,4 +503,29 @@
   border-color: var(--primary-accent);
   color: var(--primary-accent);
   background: rgba(37, 99, 235, 0.05);
+}
+
+.fullscreen-btn {
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 8px;
+  transition: all 0.2s ease;
+}
+
+.fullscreen-btn:hover {
+  border-color: var(--primary-accent);
+  color: var(--primary-accent);
+  background: rgba(37, 99, 235, 0.05);
+}
+
+.fullscreen-btn-container {
+  position: relative;
+  display: inline-block;
 }

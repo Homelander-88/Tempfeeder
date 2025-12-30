@@ -9,8 +9,12 @@ interface HeaderProps {
   username?: string;
   email?: string;
   onNavigate?: (path: string) => void;
+  currentMode?: "deep" | "normal" | "rush";
   onModeChange?: (mode: "deep" | "normal" | "rush") => void;
   onAdminToggle?: () => void;
+  onFullscreenToggle?: () => void;
+  isFullscreen?: boolean;
+  hasContent?: boolean;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -18,8 +22,13 @@ const Header: React.FC<HeaderProps> = ({
   onLogout,
   username: usernameProp,
   email: emailProp,
+  onNavigate,
+  currentMode = "normal",
   onModeChange,
-  onAdminToggle
+  onAdminToggle,
+  onFullscreenToggle,
+  isFullscreen = false,
+  hasContent = false
 }) => {
   const { user, logout: authLogout, isAdmin } = useAuth();
   
@@ -34,15 +43,12 @@ const Header: React.FC<HeaderProps> = ({
   };
   // Profile dropdown
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
-  const [showShortcutTooltip, setShowShortcutTooltip] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const profileDropdownRef = useRef<HTMLDivElement>(null);
-  const tooltipTimerRef = useRef<number | null>(null);
-
 
   // Mode dropdown
   const [modeDropdownOpen, setModeDropdownOpen] = useState(false);
-  const [currentMode, setCurrentMode] = useState<"deep" | "normal" | "rush">("normal");
+  // currentMode is now passed as a prop
 
   const modeLabel = {
     deep: "Deep mode",
@@ -51,7 +57,6 @@ const Header: React.FC<HeaderProps> = ({
   };
 
   const handleModeSelect = (mode: "deep" | "normal" | "rush") => {
-    setCurrentMode(mode);
     if (onModeChange) onModeChange(mode);
     setModeDropdownOpen(false);
   };
@@ -59,20 +64,8 @@ const Header: React.FC<HeaderProps> = ({
 
 
 
-  // Handle menu toggle tooltip
-  const handleMenuToggleHover = () => {
-    tooltipTimerRef.current = setTimeout(() => {
-      setShowShortcutTooltip(true);
-    }, 1000); // Show after 1 second
-  };
 
-  const handleMenuToggleLeave = () => {
-    if (tooltipTimerRef.current) {
-      clearTimeout(tooltipTimerRef.current);
-      tooltipTimerRef.current = null;
-    }
-    setShowShortcutTooltip(false);
-  };
+
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -93,8 +86,7 @@ const Header: React.FC<HeaderProps> = ({
           <button
             className="menu-toggle-btn"
             onClick={onMenuToggle}
-            onMouseEnter={handleMenuToggleHover}
-            onMouseLeave={handleMenuToggleLeave}
+            title="Ctrl+Z"
             aria-label="Toggle sidebar (Ctrl+Z)"
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -103,11 +95,6 @@ const Header: React.FC<HeaderProps> = ({
               <line x1="3" y1="18" x2="21" y2="18" />
             </svg>
           </button>
-          {showShortcutTooltip && (
-            <div className="shortcut-tooltip">
-              <span>Ctrl+Z</span>
-            </div>
-          )}
         </div>
         <div className="header-logo">
           <h1>SpoonFeeder</h1>
@@ -159,6 +146,38 @@ const Header: React.FC<HeaderProps> = ({
             </div>
           )}
         </div>
+
+        {/* Fullscreen Button - Only show when content is loaded */}
+        {hasContent && (
+          <div className="fullscreen-btn-container">
+            <button
+              className="fullscreen-btn"
+              onClick={onFullscreenToggle}
+              title="Shift+F"
+            >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              {isFullscreen ? (
+                <>
+                  <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 0 2-2h3M3 16h3a2 2 0 0 0 2 2v3"/>
+                </>
+              ) : (
+                <>
+                  <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                </>
+              )}
+            </svg>
+            </button>
+          </div>
+        )}
 
         {/* Admin Button - Only show for admin users */}
         {isAdmin && (

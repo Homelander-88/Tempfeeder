@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import type { JSX } from "react";
 import Header from "../../components/Header/Header";
 import Sidebar from "../../components/Sidebar/Sidebar";
 import { useHierarchy } from "../../context/HeirarchyContext";
@@ -15,12 +16,54 @@ import "./ContentView.css";
 interface ContentViewProps {
   onNavigateToLogin: () => void;
   onNavigateToHeirarchy: () => void;
+  isFullscreen?: boolean;
+  onFullscreenToggle?: () => void;
 }
 
-const ContentView: React.FC<ContentViewProps> = ({ onNavigateToLogin, onNavigateToHeirarchy }) => {
+const ContentView: React.FC<ContentViewProps> = ({
+  onNavigateToLogin,
+  onNavigateToHeirarchy,
+  isFullscreen = false,
+  onFullscreenToggle
+}) => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [playingVideos, setPlayingVideos] = useState<{ [key: string]: boolean }>({});
-  const [mode, setMode] = useState<"deep" | "normal" | "rush">("normal"); // initial mode
+  const [openResources, setOpenResources] = useState<Set<number>>(new Set());
+  const [fullscreenResource, setFullscreenResource] = useState<number | null>(null);
+  const [loadingResources, setLoadingResources] = useState<Set<number>>(new Set());
+  // Load saved mode from localStorage or default to "normal"
+  const getSavedMode = (): "deep" | "normal" | "rush" => {
+    try {
+      const saved = localStorage.getItem('contentMode');
+      if (saved === 'deep' || saved === 'normal' || saved === 'rush') {
+        return saved;
+      }
+    } catch (error) {
+      console.warn('Error reading saved mode:', error);
+    }
+    return 'normal';
+  };
+
+  const [mode, setMode] = useState<"deep" | "normal" | "rush">(getSavedMode());
+
+  // Custom setMode function that persists to localStorage
+  const handleModeChange = (newMode: "deep" | "normal" | "rush") => {
+    setMode(newMode);
+    try {
+      localStorage.setItem('contentMode', newMode);
+    } catch (error) {
+      console.warn('Error saving mode to localStorage:', error);
+    }
+  };
+
+  // Save mode to localStorage whenever it changes (fallback)
+  useEffect(() => {
+    try {
+      localStorage.setItem('contentMode', mode);
+    } catch (error) {
+      console.warn('Error saving mode to localStorage:', error);
+    }
+  }, [mode]);
   const { selectedSubtopic, hierarchy, selectedCourse, selectedTopic, courses, topics, subtopics, setSelectedCourse, setSelectedTopic, setSelectedSubtopic, loadTopics, loadSubtopics, loadContent, loadCourses, setHierarchy, clearTopicCache, clearSubtopicCache } = useHierarchy();
 
   // Debug logging for topics state
@@ -226,11 +269,18 @@ const ContentView: React.FC<ContentViewProps> = ({ onNavigateToLogin, onNavigate
   // No need for additional loading here
 
   useEffect(() => {
-    // Load content when selectedSubtopic changes
+    // Load content when selectedSubtopic changes, but don't auto-focus on sections
     if (selectedSubtopic) {
       loadContentData();
+      setOpenResources(new Set()); // Clear open resources when switching subtopics
+      setPlayingVideos({}); // Clear playing videos when switching subtopics
+      setLoadingResources(new Set()); // Clear loading resources when switching subtopics
     } else {
       setContentData(null);
+      setLoadedSections(new Set()); // Clear loaded sections
+      setOpenResources(new Set()); // Clear open resources
+      setPlayingVideos({}); // Clear playing videos
+      setLoadingResources(new Set()); // Clear loading resources
     }
   }, [selectedSubtopic]);
 
@@ -285,8 +335,7 @@ const ContentView: React.FC<ContentViewProps> = ({ onNavigateToLogin, onNavigate
       if (cachedContent) {
         setContentData(cachedContent);
         setIsLoadingContent(false);
-        // Mark all sections as loaded
-        setLoadedSections(new Set(["featuredVideo", "videos", "driveResources", "notes", "questions"]));
+        // Don't auto-load sections - let them load progressively when viewed
         return;
       }
     } else {
@@ -322,12 +371,8 @@ const ContentView: React.FC<ContentViewProps> = ({ onNavigateToLogin, onNavigate
         setContentData(emptyContent);
       }
 
-      // Simulate progressive loading for demo
-      setTimeout(() => setLoadedSections(prev => new Set([...prev, "featuredVideo"])), 300);
-      setTimeout(() => setLoadedSections(prev => new Set([...prev, "videos"])), 450);
-      setTimeout(() => setLoadedSections(prev => new Set([...prev, "driveResources"])), 600);
-      setTimeout(() => setLoadedSections(prev => new Set([...prev, "notes"])), 900);
-      setTimeout(() => setLoadedSections(prev => new Set([...prev, "questions"])), 1200);
+      // Sections will load progressively as they come into view or when interacted with
+      // No automatic loading to prevent unwanted focus on PDFs/PPTs/videos
 
     } catch (error) {
       // On error, use empty content
@@ -342,10 +387,9 @@ const ContentView: React.FC<ContentViewProps> = ({ onNavigateToLogin, onNavigate
 
       // Still simulate progressive loading
       setTimeout(() => setLoadedSections(prev => new Set([...prev, "featuredVideo"])), 300);
-      setTimeout(() => setLoadedSections(prev => new Set([...prev, "videos"])), 450);
-      setTimeout(() => setLoadedSections(prev => new Set([...prev, "driveResources"])), 600);
-      setTimeout(() => setLoadedSections(prev => new Set([...prev, "notes"])), 900);
-      setTimeout(() => setLoadedSections(prev => new Set([...prev, "questions"])), 1200);
+      setTimeout(() => setLoadedSections(prev => new Set([...prev, "driveResources"])), 450);
+      setTimeout(() => setLoadedSections(prev => new Set([...prev, "notes"])), 600);
+      setTimeout(() => setLoadedSections(prev => new Set([...prev, "questions"])), 750);
     }
 
     setIsLoadingContent(false);
@@ -354,7 +398,7 @@ const ContentView: React.FC<ContentViewProps> = ({ onNavigateToLogin, onNavigate
   const transformContentData = (backendContent: any[]) => {
     // Transform backend content array to frontend format
     const contentMap: { [key: string]: any[] } = {
-      videos: [],
+      videos: [], // Keep for featuredVideo processing
       driveResources: [],
       notes: [],
       questions: []
@@ -363,7 +407,7 @@ const ContentView: React.FC<ContentViewProps> = ({ onNavigateToLogin, onNavigate
     backendContent.forEach(item => {
       // Handle both content_type and contentType (backend may use either)
       const contentType = item.content_type || item.contentType;
-      
+
       switch (contentType) {
         case 'video':
           if (item.content && (item.content.includes('youtube.com') || item.content.includes('youtu.be'))) {
@@ -401,8 +445,8 @@ const ContentView: React.FC<ContentViewProps> = ({ onNavigateToLogin, onNavigate
 
     return {
       title: selectedSubtopic?.name || 'Content',
-      featuredVideo: contentMap.videos[0] || null,
-      videos: contentMap.videos,
+      videos: contentMap.videos, // Support multiple videos
+      featuredVideo: contentMap.videos[0] || null, // Keep for backward compatibility
       driveResources: contentMap.driveResources,
       notes: contentMap.notes.map((n: any) => n.content).join('\n\n'),
       notesItems: contentMap.notes, // Store notes with IDs
@@ -413,11 +457,106 @@ const ContentView: React.FC<ContentViewProps> = ({ onNavigateToLogin, onNavigate
 
   const handleMenuToggle = () => setSidebarCollapsed(!sidebarCollapsed);
 
+  const handleFullscreenToggle = () => {
+    if (!isFullscreen) {
+      // First close the sidebar, then enter fullscreen with smooth transition
+      setSidebarCollapsed(true);
+      // Delay to allow sidebar animation to start, then enter fullscreen
+      setTimeout(() => {
+        onFullscreenToggle?.();
+      }, 300); // Match sidebar transition duration
+    } else {
+      // Exiting fullscreen - smooth transition
+      onFullscreenToggle?.();
+    }
+  };
+
+  // Calculate optimal tooltip position to stay within viewport
+
+  // Keyboard shortcut for fullscreen (Shift+F)
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.shiftKey && event.key.toLowerCase() === 'f') {
+        event.preventDefault();
+        // Blur any focused iframe to ensure shortcuts work
+        if (document.activeElement instanceof HTMLIFrameElement) {
+          document.activeElement.blur();
+        }
+        handleFullscreenToggle();
+      }
+    };
+
+    // Use document event listener with capture to work even when focused in iframes
+    document.addEventListener('keydown', handleKeyDown, { capture: true });
+    return () => document.removeEventListener('keydown', handleKeyDown, { capture: true });
+  }, [isFullscreen]); // Include dependencies
+
+  // Keyboard shortcut for closing resources (Shift+X), exiting resource fullscreen (Escape), and toggling resource fullscreen (Shift+S)
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Handle resource fullscreen exit (Escape key)
+      if (event.key === 'Escape' && fullscreenResource) {
+        event.preventDefault();
+        // Blur any focused iframe to ensure shortcuts work
+        if (document.activeElement instanceof HTMLIFrameElement) {
+          document.activeElement.blur();
+        }
+        setFullscreenResource(null);
+        setLoadingResources(new Set()); // Clear loading states when exiting fullscreen
+        return;
+      }
+
+      // Handle resource fullscreen toggle (Shift+S)
+      if (event.shiftKey && event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        // Blur any focused iframe to ensure shortcuts work
+        if (document.activeElement instanceof HTMLIFrameElement) {
+          document.activeElement.blur();
+        }
+        if (fullscreenResource) {
+          // Currently in fullscreen, exit
+          setFullscreenResource(null);
+        } else if (openResources.size > 0) {
+          // Enter fullscreen for the first open resource - pause any playing videos
+          setPlayingVideos({}); // Pause all videos when entering resource fullscreen
+          const firstOpenResourceId = Array.from(openResources)[0];
+          setLoadingResources(prev => new Set([...prev, firstOpenResourceId])); // Show loading for fullscreen
+          setFullscreenResource(firstOpenResourceId);
+        }
+        return;
+      }
+
+      if (event.shiftKey && event.key.toLowerCase() === 'x' && openResources.size > 0) {
+        // Debug: Log the event
+        console.log('Shift+X pressed, openResources:', openResources.size);
+
+        event.preventDefault();
+        // Close all open resources regardless of focus
+        setOpenResources(new Set());
+        setLoadingResources(new Set()); // Clear loading states
+
+        // Remove focus from any iframe
+        const activeElement = document.activeElement;
+        if (activeElement && activeElement instanceof HTMLElement) {
+          activeElement.blur();
+        }
+      }
+    };
+
+    // Use document event listener with capture to work even when focused in iframes
+    document.addEventListener('keydown', handleKeyDown, { capture: true });
+    return () => document.removeEventListener('keydown', handleKeyDown, { capture: true });
+  }, [openResources, fullscreenResource]);
+
   // Add keyboard shortcuts for sidebar toggle (Ctrl+Z) and highlight undo (Ctrl+Z when toolbar is visible)
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.ctrlKey && event.key === 'z') {
         event.preventDefault();
+        // Blur any focused iframe to ensure shortcuts work
+        if (document.activeElement instanceof HTMLIFrameElement) {
+          document.activeElement.blur();
+        }
 
         // If highlight toolbar is visible, undo the last highlight instead of toggling sidebar
         if (showToolbar) {
@@ -428,8 +567,9 @@ const ContentView: React.FC<ContentViewProps> = ({ onNavigateToLogin, onNavigate
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    // Use document event listener with capture to work even when focused in iframes
+    document.addEventListener('keydown', handleKeyDown, { capture: true });
+    return () => document.removeEventListener('keydown', handleKeyDown, { capture: true });
   }, [sidebarCollapsed, showToolbar]);
 
   // Undo last highlight functionality
@@ -503,41 +643,376 @@ const ContentView: React.FC<ContentViewProps> = ({ onNavigateToLogin, onNavigate
 
   const handlePlayVideo = (id: string) => setPlayingVideos({ ...playingVideos, [id]: true });
 
-  const renderMarkdown = (text: string) => {
+  // Parse and render structured text with visual elements for hierarchy
+  const parseStructuredText = (text: string) => {
+    if (!text || text.trim() === '') {
+      return [<p key="empty" className="structured-paragraph">No content available</p>];
+    }
+
     const lines = text.split('\n');
-    const elements: React.JSX.Element[] = [];
-    let key = 0;
+    const elements: JSX.Element[] = [];
+    let inList = false;
+    let listItems: JSX.Element[] = [];
+    let currentIndentation = 0;
+    let listType: 'bullet' | 'numbered' = 'bullet';
+    let listStartNumber = 1;
+    let inCodeBlock = false;
+    let codeBlockLines: string[] = [];
+    let codeBlockLanguage = '';
+    let inTable = false;
+    let tableRows: string[][] = [];
+    let tableHeaders: string[] = [];
 
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-
-      if (line.startsWith('# ')) {
-        elements.push(<h1 key={key++} className="notes-h1">{line.substring(2)}</h1>);
-      } else if (line.startsWith('## ')) {
-        elements.push(<h2 key={key++} className="notes-h2">{line.substring(3)}</h2>);
-      } else if (line.startsWith('### ')) {
-        elements.push(<h3 key={key++} className="notes-h3">{line.substring(4)}</h3>);
-      } else if (line.startsWith('1. ')) {
-        // Handle numbered lists
-        const listItems: React.JSX.Element[] = [];
-        let j = i;
-        while (j < lines.length && (lines[j].match(/^\d+\. /) || lines[j].trim() === '')) {
-          if (lines[j].match(/^\d+\. /)) {
-            listItems.push(<li key={key++}>{lines[j].replace(/^\d+\. /, '')}</li>);
-          }
-          j++;
+    const flushList = () => {
+      if (listItems.length > 0) {
+        if (listType === 'numbered') {
+          elements.push(
+            <ol key={`list-${elements.length}`} className="structured-list structured-numbered-list" start={listStartNumber}>
+              {listItems}
+            </ol>
+          );
+        } else {
+          elements.push(
+            <ul key={`list-${elements.length}`} className="structured-list">
+              {listItems}
+            </ul>
+          );
         }
-        elements.push(<ol key={key++} className="notes-list">{listItems}</ol>);
-        i = j - 1;
-      } else if (line.trim() === '') {
-        // Skip empty lines
-        continue;
-      } else if (line.trim()) {
-        elements.push(<p key={key++} className="notes-paragraph">{line}</p>);
+        listItems = [];
+        inList = false;
+        listStartNumber = 1;
       }
+    };
+
+    const flushTable = () => {
+      if (inTable && tableRows.length > 0) {
+        elements.push(
+          <table key={`table-${elements.length}`} className="structured-table">
+            {tableHeaders.length > 0 && (
+              <thead>
+                <tr>
+                  {tableHeaders.map((header, index) => (
+                    <th key={index} className="structured-table-header">
+                      {parseInlineFormatting(header.trim())}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+            )}
+            <tbody>
+              {tableRows.map((row, rowIndex) => (
+                <tr key={rowIndex}>
+                  {row.map((cell, cellIndex) => (
+                    <td key={cellIndex} className="structured-table-cell">
+                      {parseInlineFormatting(cell.trim())}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        );
+        inTable = false;
+        tableRows = [];
+        tableHeaders = [];
+      }
+    };
+
+    lines.forEach((line, index) => {
+      const trimmedLine = line.trim();
+      const leadingSpaces = line.length - line.trimLeft().length;
+
+      // Code block handling (triple backticks)
+      const codeBlockStart = trimmedLine.match(/^```(\w+)?$/);
+      if (codeBlockStart) {
+        flushList();
+        flushTable();
+        if (inCodeBlock) {
+          // End of code block
+          elements.push(
+            <pre
+              key={`code-${index}`}
+              className="structured-code-block"
+              data-language={codeBlockLanguage || 'text'}
+            >
+              <code className={`language-${codeBlockLanguage || 'text'}`}>
+                {codeBlockLines.join('\n')}
+              </code>
+            </pre>
+          );
+          inCodeBlock = false;
+          codeBlockLines = [];
+          codeBlockLanguage = '';
+        } else {
+          // Start of code block
+          inCodeBlock = true;
+          codeBlockLanguage = codeBlockStart[1] || '';
+        }
+        return;
+      }
+
+      // If inside code block, collect lines
+      if (inCodeBlock) {
+        codeBlockLines.push(line); // Preserve original line including indentation
+        return;
+      }
+
+      // Table detection - Markdown format
+      const tableRow = trimmedLine.match(/^\|(.+)\|$/);
+      const tableSeparator = trimmedLine.match(/^\|[\s\-\|:]+\|$/);
+
+      if (tableRow && !inTable) {
+        // Start of table
+        flushList();
+        inTable = true;
+        const cells = trimmedLine.split('|').slice(1, -1).map(cell => cell.trim());
+        tableHeaders = cells;
+      } else if (tableSeparator && inTable && tableHeaders.length > 0) {
+        // Table separator row - skip this
+        return;
+      } else if (tableRow && inTable) {
+        // Table data row
+        const cells = trimmedLine.split('|').slice(1, -1).map(cell => cell.trim());
+        tableRows.push(cells);
+        return;
+      } else if (inTable && trimmedLine === '') {
+        // Empty line ends table
+        flushTable();
+        return;
+      } else if (inTable && !tableRow) {
+        // Non-table line ends table
+        flushTable();
+      }
+
+      // Table detection - Dot format (Name. Age. City)
+      const dotSeparated = trimmedLine.split('.').map(cell => cell.trim()).filter(cell => cell);
+      const isDotTable = dotSeparated.length >= 2; // At least 2 columns
+
+      if (isDotTable && !inTable) {
+        // Check if this could be a table header by looking at next lines
+        const nextLines = lines.slice(index + 1, index + 3);
+        const hasConsistentDotRows = nextLines.every(line => {
+          const cells = line.trim().split('.').map(cell => cell.trim()).filter(cell => cell);
+          return cells.length === dotSeparated.length;
+        });
+
+        if (hasConsistentDotRows && nextLines.length > 0) {
+          // Start of dot table
+          flushList();
+          inTable = true;
+          tableHeaders = dotSeparated;
+          return;
+        }
+      }
+
+      if (isDotTable && inTable && dotSeparated.length === tableHeaders.length) {
+        // Dot table data row
+        tableRows.push(dotSeparated);
+        return;
+      }
+
+      // End table on empty line or inconsistent format
+      if (inTable && (trimmedLine === '' || (isDotTable && dotSeparated.length !== tableHeaders.length))) {
+        flushTable();
+        if (trimmedLine === '') return;
+      }
+
+      // Indented code block (4+ spaces or tab)
+      if (leadingSpaces >= 4 || line.startsWith('\t')) {
+        flushList();
+        // Check if this starts a new code block or continues existing
+        if (elements.length > 0 && elements[elements.length - 1]?.props?.className === 'structured-code-block') {
+          // Extend existing code block
+          const lastElement = elements[elements.length - 1];
+          const existingCode = lastElement.props.children.props.children;
+          elements[elements.length - 1] = (
+            <pre key={`code-extended-${index}`} className="structured-code-block">
+              <code className="language-text">
+                {existingCode + '\n' + line}
+              </code>
+            </pre>
+          );
+        } else {
+          // Start new indented code block
+          elements.push(
+            <pre key={`code-${index}`} className="structured-code-block">
+              <code className="language-text">
+                {line}
+              </code>
+            </pre>
+          );
+        }
+        return;
+      }
+
+      // Empty line - flush any pending list
+      if (!trimmedLine) {
+        flushList();
+        return;
+      }
+
+      // Headings (# ## ###)
+      const headingMatch = trimmedLine.match(/^(#{1,6})\s*(.+)?$/);
+      if (headingMatch) {
+        flushList();
+        flushTable();
+        const level = headingMatch[1].length;
+        const content = headingMatch[2] || '';
+        const className = `structured-heading structured-h${level}`;
+        elements.push(
+          <div key={index} className={className}>
+            {parseInlineFormatting(content)}
+          </div>
+        );
+        return;
+      }
+
+      // Blockquotes (> text)
+      const blockquoteMatch = trimmedLine.match(/^>\s*(.+)$/);
+      if (blockquoteMatch) {
+        flushList();
+        flushTable();
+        elements.push(
+          <blockquote key={index} className="structured-blockquote">
+            {parseInlineFormatting(blockquoteMatch[1])}
+          </blockquote>
+        );
+        return;
+      }
+
+      // Horizontal lines (--- or ***)
+      const horizontalLineMatch = trimmedLine.match(/^[-*_]{3,}$/);
+      if (horizontalLineMatch) {
+        flushList();
+        elements.push(
+          <hr key={index} className="structured-horizontal-line" />
+        );
+        return;
+      }
+
+      // Numbered lists (1., 2., etc.)
+      const numberedMatch = trimmedLine.match(/^(\d+)\.\s+(.+)$/);
+      if (numberedMatch) {
+        const listNumber = parseInt(numberedMatch[1]);
+        const content = numberedMatch[2];
+        const indentation = Math.floor(leadingSpaces / 2);
+
+        if (!inList || listType !== 'numbered' || indentation !== currentIndentation) {
+          flushList();
+          inList = true;
+          listType = 'numbered';
+          currentIndentation = indentation;
+          listStartNumber = listNumber;
+        }
+
+        listItems.push(
+          <li key={`item-${index}`} className="structured-list-item" style={{ marginLeft: `${indentation * 20}px` }}>
+            {parseInlineFormatting(content)}
+          </li>
+        );
+        return;
+      }
+
+      // Bullet points (*, -, •)
+      const bulletMatch = trimmedLine.match(/^[-*•]\s+(.+)$/);
+      if (bulletMatch) {
+        const content = bulletMatch[1];
+        const indentation = Math.floor(leadingSpaces / 2);
+
+        if (!inList || listType !== 'bullet' || indentation !== currentIndentation) {
+          flushList();
+          inList = true;
+          listType = 'bullet';
+          currentIndentation = indentation;
+        }
+
+        listItems.push(
+          <li key={`item-${index}`} className="structured-list-item" style={{ marginLeft: `${indentation * 20}px` }}>
+            {parseInlineFormatting(content)}
+          </li>
+        );
+        return;
+      }
+
+      // Regular paragraphs
+      flushList();
+      elements.push(
+        <p key={index} className="structured-paragraph">
+          {parseInlineFormatting(trimmedLine)}
+        </p>
+      );
+    });
+
+    flushList();
+    flushTable();
+
+    // Handle unclosed code block
+    if (inCodeBlock && codeBlockLines.length > 0) {
+      elements.push(
+        <pre
+          key="code-unclosed"
+          className="structured-code-block"
+          data-language={codeBlockLanguage || 'text'}
+        >
+          <code className={`language-${codeBlockLanguage || 'text'}`}>
+            {codeBlockLines.join('\n')}
+          </code>
+        </pre>
+      );
+    }
+
+    // Ensure we always return at least one element
+    if (elements.length === 0) {
+      return [<p key="empty" className="structured-paragraph">Content could not be parsed</p>];
     }
 
     return elements;
+  };
+
+  // Parse inline formatting like **bold** and *italic*
+  const parseInlineFormatting = (text: string) => {
+    if (!text) return text;
+
+    let formattedText = text;
+
+    // Escape HTML entities first to prevent XSS
+    formattedText = formattedText
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+    // Links [text](url)
+    formattedText = formattedText.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="structured-link" target="_blank" rel="noopener noreferrer">$1</a>');
+
+    // Strikethrough (~~text~~)
+    formattedText = formattedText.replace(/~~(.*?)~~/g, '<span class="structured-strikethrough">$1</span>');
+
+    // Bold text (**text**) - handle multiline and nested
+    formattedText = formattedText.replace(/\*\*(.*?)\*\*/g, '<span class="structured-bold">$1</span>');
+
+    // Italic text (*text* or _text_) - but avoid matching **bold** patterns
+    formattedText = formattedText.replace(/(?<!\*)\*(?!\*)([^*]+?)(?<!\*)\*(?!\*)/g, '<span class="structured-italic">$1</span>');
+    formattedText = formattedText.replace(/(?<!_)_([^_]+?)_(?!_)/g, '<span class="structured-italic">$1</span>');
+
+    // Inline code (`code`) - handle escaped backticks and multiple lines
+    formattedText = formattedText.replace(/`([^`\n]+)`/g, '<code class="structured-inline-code">$1</code>');
+
+    // Handle line breaks within paragraphs
+    formattedText = formattedText.replace(/\n/g, '<br>');
+
+    // Return as dangerouslySetInnerHTML to render HTML
+    return <span dangerouslySetInnerHTML={{ __html: formattedText }} />;
+  };
+
+  // Render notes with structured parsing
+  const renderMarkdown = (text: string) => {
+    return (
+      <div className="notes-structured">
+        {parseStructuredText(text)}
+      </div>
+    );
   };
 
   const handleSelection = () => {
@@ -573,7 +1048,7 @@ const ContentView: React.FC<ContentViewProps> = ({ onNavigateToLogin, onNavigate
 
   const sectionsOrder = () => {
     // Conditional sections based on mode
-    const allSections = ["featuredVideo", "videos", "driveResources", "notes", "questions"];
+    const allSections = ["featuredVideo", "driveResources", "notes", "questions"];
 
     return allSections.filter(section => {
       switch (mode) {
@@ -582,7 +1057,7 @@ const ContentView: React.FC<ContentViewProps> = ({ onNavigateToLogin, onNavigate
         case "normal":
           return section !== "notes"; // Hide notes section
         case "rush":
-          return section !== "featuredVideo" && section !== "notes"; // Hide videos and notes
+          return section !== "notes" && section !== "featuredVideo"; // Hide notes and video
         default:
           return true;
       }
@@ -590,6 +1065,12 @@ const ContentView: React.FC<ContentViewProps> = ({ onNavigateToLogin, onNavigate
   };
 
   const renderSection = (section: string) => {
+    // Load section on demand when first accessed (don't auto-focus on PDFs/PPTs/videos)
+    if (!loadedSections.has(section) && contentData && !isLoadingContent) {
+      // Mark section as loaded immediately when accessed
+      setLoadedSections(prev => new Set([...prev, section]));
+    }
+
     // Show loading animation if content is still loading and section hasn't loaded yet
     if (isLoadingContent && !loadedSections.has(section)) {
       return (
@@ -610,41 +1091,11 @@ const ContentView: React.FC<ContentViewProps> = ({ onNavigateToLogin, onNavigate
 
     switch (section) {
       case "featuredVideo":
-        if (!contentData.featuredVideo) return null;
-        return (
-          <section className="section" key="featuredVideo">
-            <h2 className="section-title">Video Content</h2>
-            <div className="video-card compact centered-content">
-              <div className="video-wrapper small">
-                {playingVideos["featured"] ? (
-                  <iframe
-                    src={`https://www.youtube.com/embed/${getYoutubeId(contentData.featuredVideo.youtubeUrl)}?autoplay=1&rel=0&modestbranding=1&showinfo=0`}
-                    allow="autoplay; encrypted-media"
-                    allowFullScreen
-                  />
-                ) : (
-                  <div
-                    className="video-placeholder"
-                    onClick={() => handlePlayVideo("featured")}
-                    style={{
-                      backgroundImage: `url(https://img.youtube.com/vi/${getYoutubeId(contentData.featuredVideo.youtubeUrl)}/maxresdefault.jpg)`,
-                      backgroundSize: 'cover',
-                      backgroundPosition: 'center'
-                    }}
-                  >
-                    <div className="play-icon">▶</div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </section>
-        );
-      case "videos":
         const hasVideos = contentData.videos && contentData.videos.length > 0;
         return (
-          <section className="section" key="videos">
+          <section className="section" key="featuredVideo">
             <div className="section-header">
-              <h2 className="section-title">Videos</h2>
+              <h2 className="section-title">Video Content</h2>
               {isAdmin && hasVideos && (
                 <button
                   className="section-delete-btn"
@@ -673,13 +1124,12 @@ const ContentView: React.FC<ContentViewProps> = ({ onNavigateToLogin, onNavigate
                 </button>
               )}
             </div>
-            <div className="video-list">
-              {contentData.videos && contentData.videos.length > 0 && contentData.videos.map((video: any, index: number) => {
-                const id = `video-${index}`;
-                return (
-                  <div className="video-card compact" key={index}>
-                    <div className="video-card-header">
-                      <p className="video-title">{video.title}</p>
+            {contentData.videos && contentData.videos.length > 0 && (
+              <div className="videos-container">
+                {contentData.videos.map((video: any) => {
+                  const videoId = `video-${video.id}`;
+                  return (
+                    <div className="video-item" key={video.id}>
                       {isAdmin && (
                         <button
                           className="video-delete-btn"
@@ -699,95 +1149,108 @@ const ContentView: React.FC<ContentViewProps> = ({ onNavigateToLogin, onNavigate
                           </svg>
                         </button>
                       )}
-                    </div>
-                    <div className="video-wrapper small ">
-                      {playingVideos[id] ? (
-                        <iframe 
-                          src={`https://www.youtube.com/embed/${getYoutubeId(video.youtubeUrl)}?autoplay=1&rel=0&modestbranding=1&showinfo=0`} 
-                          allow="autoplay; encrypted-media" 
-                          allowFullScreen 
-                        />
-                      ) : (
-                        <div className="video-placeholder" onClick={() => handlePlayVideo(id)}>
-                          <div className="play-icon">▶</div>
+                      <div className="video-card compact centered-content">
+                        <div className="video-wrapper small">
+                          {playingVideos[videoId] ? (
+                            <iframe
+                              src={`https://www.youtube.com/embed/${getYoutubeId(video.youtubeUrl)}?autoplay=1&rel=0&modestbranding=1&showinfo=0`}
+                              allow="autoplay; encrypted-media"
+                              allowFullScreen
+                            />
+                          ) : (
+                            <div
+                              className="video-placeholder"
+                              onClick={() => handlePlayVideo(videoId)}
+                              style={{
+                                backgroundImage: `url(https://img.youtube.com/vi/${getYoutubeId(video.youtubeUrl)}/maxresdefault.jpg)`,
+                                backgroundSize: 'cover',
+                                backgroundPosition: 'center'
+                              }}
+                            >
+                              <div className="play-icon">▶</div>
+                              {video.title && (
+                                <div className="video-title-overlay">{video.title}</div>
+                              )}
+                            </div>
+                          )}
                         </div>
-                      )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Add Video Button for Admin - always show for admins */}
+            {isAdmin && (
+              <div className="content-add-section">
+                {!showContentAddForm.visible || showContentAddForm.section !== 'featuredVideo' ? (
+                  <button
+                    className="content-add-btn"
+                    onClick={() => {
+                      setShowContentAddForm({ section: 'featuredVideo', visible: true });
+                      setContentAddFormData({ contentType: 'video', title: '', content: '' });
+                    }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polygon points="23 7 16 12 23 17 23 7"/>
+                      <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                    </svg>
+                    Add Video
+                  </button>
+                ) : (
+                  <div className="content-add-form">
+                    <div className="add-form-row">
+                      <input
+                        type="text"
+                        placeholder="Video Title"
+                        value={contentAddFormData.title}
+                        onChange={(e) => setContentAddFormData({...contentAddFormData, title: e.target.value})}
+                        className="content-form-input"
+                      />
+                      <input
+                        type="url"
+                        placeholder="YouTube Video URL"
+                        value={contentAddFormData.content}
+                        onChange={(e) => setContentAddFormData({...contentAddFormData, content: e.target.value})}
+                        className="content-form-input"
+                      />
+                    </div>
+                    <div className="add-form-buttons">
+                      <button
+                        className="add-form-submit"
+                        onClick={async () => {
+                          if (selectedSubtopic) {
+                            try {
+                              await createSubtopicContent(parseInt(selectedSubtopic.id), {
+                                contentType: 'video',
+                                contentOrder: 1,
+                                title: contentAddFormData.title,
+                                content: contentAddFormData.content
+                              });
+                              // Refresh content
+                              loadContentData();
+                              setShowContentAddForm({ section: '', visible: false });
+                            } catch (error) {
+                              console.error('Error adding video:', error);
+                            }
+                          }
+                        }}
+                        disabled={!contentAddFormData.title.trim() || !contentAddFormData.content.trim()}
+                      >
+                        Add
+                      </button>
+                      <button
+                        className="add-form-cancel"
+                        onClick={() => setShowContentAddForm({ section: '', visible: false })}
+                      >
+                        ✕
+                      </button>
                     </div>
                   </div>
-                );
-              })}
-
-              {/* Add Video Button for Admin - always show for admins */}
-              {isAdmin && (
-                <div className="content-add-section">
-                  {!showContentAddForm.visible || showContentAddForm.section !== 'videos' ? (
-                    <button
-                      className="content-add-btn"
-                      onClick={() => {
-                        setShowContentAddForm({ section: 'videos', visible: true });
-                        setContentAddFormData({ contentType: 'video', title: '', content: '' });
-                      }}
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <polygon points="23 7 16 12 23 17 23 7"></polygon>
-                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
-                      </svg>
-                      Add Video
-                    </button>
-                  ) : (
-                    <div className="content-add-form">
-                      <div className="add-form-row">
-                        <input
-                          type="text"
-                          placeholder="Video Title"
-                          value={contentAddFormData.title}
-                          onChange={(e) => setContentAddFormData({...contentAddFormData, title: e.target.value})}
-                          className="content-form-input"
-                        />
-                        <input
-                          type="url"
-                          placeholder="YouTube URL"
-                          value={contentAddFormData.content}
-                          onChange={(e) => setContentAddFormData({...contentAddFormData, content: e.target.value})}
-                          className="content-form-input"
-                        />
-                      </div>
-                      <div className="add-form-buttons">
-                        <button
-                          className="add-form-submit"
-                          onClick={async () => {
-                            if (selectedSubtopic) {
-                              try {
-                                await createSubtopicContent(parseInt(selectedSubtopic.id), {
-                                  contentType: 'video', // Backend expects 'video' not 'videos'
-                                  contentOrder: 1,
-                                  title: contentAddFormData.title,
-                                  content: contentAddFormData.content
-                                });
-                                // Refresh content
-                                loadContentData();
-                                setShowContentAddForm({ section: '', visible: false });
-                              } catch (error) {
-                                console.error('Error adding content:', error);
-                              }
-                            }
-                          }}
-                          disabled={!contentAddFormData.title.trim() || !contentAddFormData.content.trim()}
-                        >
-                          Add
-                        </button>
-                        <button
-                          className="add-form-cancel"
-                          onClick={() => setShowContentAddForm({ section: '', visible: false })}
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
           </section>
         );
       case "driveResources":
@@ -795,7 +1258,7 @@ const ContentView: React.FC<ContentViewProps> = ({ onNavigateToLogin, onNavigate
         return (
           <section className="section" key="driveResources">
             <div className="section-header">
-              <h2 className="section-title">Presentation & Resources</h2>
+              <h2 className="section-title resources-section-title">Presentation & Resources</h2>
               {isAdmin && hasDriveResources && (
                 <button
                   className="section-delete-btn"
@@ -824,41 +1287,134 @@ const ContentView: React.FC<ContentViewProps> = ({ onNavigateToLogin, onNavigate
                 </button>
               )}
             </div>
-            <div className="drive-resources-container centered-content">
-              {contentData.driveResources.map((res: any, index: number) => (
-                <div className="resource-item centered-content" key={index}>
-                  <div className="resource-item-header">
-                    {res.title && <h3 className="resource-title">{res.title}</h3>}
-                    {isAdmin && (
-                      <button
-                        className="resource-delete-btn"
-                        onClick={async () => {
-                          try {
-                            await deleteSubtopicContent(res.id);
-                            loadContentData();
-                          } catch (error) {
-                            console.error('Error deleting resource:', error);
-                          }
+            <div className="drive-resources-container">
+              {contentData.driveResources.map((res: any, index: number) => {
+                const isOpen = openResources.has(res.id);
+                const isPdf = res.url.toLowerCase().includes('.pdf');
+                const isPpt = res.url.toLowerCase().includes('.ppt') || res.url.toLowerCase().includes('.pptx');
+
+                return (
+                  <div className="resource-item" key={index}>
+                    {!isOpen ? (
+                      // Preview mode - clickable to open
+                      <div
+                        className="resource-preview"
+                        onClick={() => {
+                          setLoadingResources(prev => new Set([...prev, res.id]));
+                          setOpenResources(prev => new Set([...prev, res.id]));
                         }}
-                        title="Delete resource"
                       >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <polyline points="3 6 5 6 21 6"></polyline>
-                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                        </svg>
-                      </button>
+                        <div className="resource-preview-icon">
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14,2 14,8 20,8"/>
+                            <line x1="16" y1="13" x2="8" y2="13"/>
+                            <line x1="16" y1="17" x2="8" y2="17"/>
+                            <polyline points="10,9 9,9 8,9"/>
+                          </svg>
+                        </div>
+                        <div className="resource-preview-content">
+                          <h3 className="resource-preview-title">
+                            {res.title || (isPdf ? 'PDF Document' : isPpt ? 'Presentation' : 'Resource')}
+                          </h3>
+                          <p className="resource-preview-desc">
+                            Click to view {isPdf ? 'PDF document' : isPpt ? 'presentation slides' : 'external resource'}
+                          </p>
+                        </div>
+                        <div className="resource-preview-arrow">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M9 18l6-6-6-6"/>
+                          </svg>
+                        </div>
+                      </div>
+                    ) : (
+                      // Open mode - show iframe with close option
+                      <>
+                        <div className="resource-item-header">
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
+                            {res.title && <h3 className="resource-title">{res.title}</h3>}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            {isAdmin && (
+                              <button
+                                className="resource-delete-btn"
+                                onClick={async () => {
+                                  try {
+                                    await deleteSubtopicContent(res.id);
+                                    loadContentData();
+                                  } catch (error) {
+                                    console.error('Error deleting resource:', error);
+                                  }
+                                }}
+                                title="Delete resource"
+                              >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <polyline points="3 6 5 6 21 6"></polyline>
+                                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                </svg>
+                              </button>
+                            )}
+                            <div className="resource-close-btn-container">
+                              <button
+                                className="resource-fullscreen-btn"
+                                onClick={() => {
+                                  setPlayingVideos({}); // Pause all videos when entering resource fullscreen
+                                  setLoadingResources(prev => new Set([...prev, res.id])); // Show loading for fullscreen
+                                  setFullscreenResource(res.id);
+                                }}
+                                title="Fullscreen (Shift+S)"
+                              >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                </svg>
+                              </button>
+                              <button
+                                className="resource-close-btn"
+                                onClick={() => {
+                                  setOpenResources(prev => {
+                                    const newSet = new Set(prev);
+                                    newSet.delete(res.id);
+                                    return newSet;
+                                  });
+                                }}
+                                title="Shift+X"
+                              >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <line x1="18" y1="6" x2="6" y2="18"/>
+                                  <line x1="6" y1="6" x2="18" y2="18"/>
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="resource-frame-wrapper">
+                          {loadingResources.has(res.id) && (
+                            <div className="resource-loading">
+                              <div className="resource-loading-spinner"></div>
+                              <span className="resource-loading-text">Loading resource...</span>
+                            </div>
+                          )}
+                          <iframe
+                            className="resource-frame"
+                            src={res.url}
+                            allow="autoplay"
+                            title={res.title}
+                            onLoad={() => setLoadingResources(prev => {
+                              const newSet = new Set(prev);
+                              newSet.delete(res.id);
+                              return newSet;
+                            })}
+                            style={{
+                              opacity: loadingResources.has(res.id) ? 0 : 1,
+                              transition: 'opacity 0.3s ease-in-out'
+                            }}
+                          />
+                        </div>
+                      </>
                     )}
                   </div>
-                  <div className="resource-frame-wrapper">
-                    <iframe
-                      className="resource-frame"
-                      src={res.url}
-                      allow="autoplay"
-                      title={res.title}
-                    />
-                  </div>
-                </div>
-              ))}
+                );
+              })}
 
               {/* Add Content Button for Admin - always show for admins */}
               {isAdmin && (
@@ -1130,7 +1686,9 @@ const ContentView: React.FC<ContentViewProps> = ({ onNavigateToLogin, onNavigate
                       <summary className="qa-widget-question">
                         <div className="question-content">
                           <span className="question-number">{index + 1}.</span>
-                          <span className="question-text">{q.question}</span>
+                          <span className="question-text">
+                            {parseInlineFormatting(q.question)}
+                          </span>
                         </div>
                         <svg
                           width="18"
@@ -1147,7 +1705,9 @@ const ContentView: React.FC<ContentViewProps> = ({ onNavigateToLogin, onNavigate
                         </svg>
                       </summary>
                       <div className="qa-widget-answer">
-                        <div className="answer-content">{q.answer}</div>
+                        <div className="answer-content">
+                          {parseStructuredText(q.answer)}
+                        </div>
                       </div>
                     </details>
                   </div>
@@ -1233,10 +1793,127 @@ const ContentView: React.FC<ContentViewProps> = ({ onNavigateToLogin, onNavigate
     }
   };
 
+  // Render fullscreen resource if one is selected
+  if (fullscreenResource) {
+    const resources = contentData?.driveResources || [];
+    const currentIndex = resources.findIndex((res: any) => res.id === fullscreenResource);
+    const resource = resources[currentIndex];
+    const hasMultipleResources = resources.length > 1;
+
+    const navigateToResource = (direction: 'prev' | 'next') => {
+      if (!hasMultipleResources) return;
+
+      let newIndex;
+      if (direction === 'prev') {
+        newIndex = currentIndex > 0 ? currentIndex - 1 : resources.length - 1;
+      } else {
+        newIndex = currentIndex < resources.length - 1 ? currentIndex + 1 : 0;
+      }
+
+      setFullscreenResource(resources[newIndex].id);
+    };
+
+    if (resource) {
+      return (
+        <div className="resource-fullscreen-mode">
+          <div className="resource-fullscreen-header">
+            {hasMultipleResources && (
+              <div className="resource-nav-buttons">
+                <button
+                  className="resource-nav-btn resource-nav-prev"
+                  onClick={() => navigateToResource('prev')}
+                  title="Previous Resource"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M15 18l-6-6 6-6"/>
+                  </svg>
+                </button>
+                <button
+                  className="resource-nav-btn resource-nav-next"
+                  onClick={() => navigateToResource('next')}
+                  title="Next Resource"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 18l6-6-6-6"/>
+                  </svg>
+                </button>
+              </div>
+            )}
+            <div className="resource-fullscreen-title">
+              {resource.title || 'Resource'}
+              {hasMultipleResources && (
+                <span className="resource-counter">
+                  {currentIndex + 1} of {resources.length}
+                </span>
+              )}
+            </div>
+            <button
+              className="resource-fullscreen-exit-btn"
+              onClick={() => setFullscreenResource(null)}
+              title="Exit Fullscreen (Shift+S)"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 0 2-2h3M3 16h3a2 2 0 0 0 2 2v3"/>
+              </svg>
+            </button>
+          </div>
+          <div className="resource-fullscreen-content">
+            {loadingResources.has(resource.id) && (
+              <div className="resource-fullscreen-loading">
+                <div className="resource-loading-spinner"></div>
+                <span className="resource-loading-text">Loading resource...</span>
+              </div>
+            )}
+            <iframe
+              className="resource-fullscreen-iframe"
+              src={resource.url}
+              allow="autoplay"
+              title={resource.title}
+              onLoad={() => setLoadingResources(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(resource.id);
+                return newSet;
+              })}
+              style={{
+                opacity: loadingResources.has(resource.id) ? 0 : 1,
+                transition: 'opacity 0.3s ease-in-out'
+              }}
+            />
+          </div>
+        </div>
+      );
+    }
+  }
+
   return (
-    <div className="content-view login-style">
-      <Header onMenuToggle={handleMenuToggle} onNavigate={handleNavigate} onModeChange={setMode} onAdminToggle={() => setShowAdminPanel(!showAdminPanel)} />
-      {(() => {
+    <div className={`content-view login-style ${isFullscreen ? 'fullscreen-mode' : ''}`}>
+      {!isFullscreen && (
+      <Header
+        onMenuToggle={handleMenuToggle}
+        onNavigate={handleNavigate}
+        currentMode={mode}
+        onModeChange={handleModeChange}
+        onAdminToggle={() => setShowAdminPanel(!showAdminPanel)}
+        onFullscreenToggle={handleFullscreenToggle}
+        isFullscreen={isFullscreen}
+        hasContent={!!contentData}
+      />
+      )}
+
+      {/* Fullscreen Exit Button */}
+      {isFullscreen && (
+        <button
+          className="fullscreen-exit-btn"
+          onClick={onFullscreenToggle}
+          title="Exit Fullscreen"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      )}
+      {!isFullscreen && (() => {
         console.log('Calculating sidebar - selectedCourse:', selectedCourse, 'topics:', topics, 'courses:', courses);
         const sidebarMode = selectedTopic ? "subtopics" : selectedCourse ? "topics" : "courses";
         const sidebarItems = selectedTopic ? subtopics : selectedCourse ? topics : courses;
