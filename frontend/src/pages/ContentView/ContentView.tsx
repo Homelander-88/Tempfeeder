@@ -465,9 +465,11 @@ const ContentView: React.FC<ContentViewProps> = ({ onNavigateToLogin, onNavigate
   };
 
   const handleTopicClick = async (topic: any) => {
-    // Clear previous subtopic selection and content
-    setSelectedSubtopic(null);
-    setContentData(null);
+    // Keep subtopic selection and content when switching topics
+    // Only clear when selecting a different subtopic, not when switching topics
+    // setSelectedSubtopic(null);  // Commented out to maintain focus
+    // setContentData(null);       // Commented out to maintain focus
+
     // Set the new topic and load its subtopics
     setSelectedTopic(topic);
     setIsLoadingSubtopics(true);

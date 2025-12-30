@@ -1,10 +1,7 @@
 /* File: frontend/src/components/SettingsDropdown/SettingsDropdown.css */
 
 .settings-dropdown-container {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
+    position: relative;
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
     width: 100%;
     z-index: 1010;
@@ -18,34 +15,40 @@
     width: 100%;
     background-color: #1A1A1C; /* dark background */
     border: 1px solid #26262A;
-    border-top: none;
-    border-radius: 0 0 1.5px 1.5px;
+    border-radius: 6px;
     padding: 12px 16px;
-    box-shadow:
-            0 25px 50px rgba(0, 0, 0, 0.3),
-            0 15px 35px rgba(0, 0, 0, 0.2),
-            0 8px 20px rgba(0, 0, 0, 0.15),
-            0 4px 10px rgba(0, 0, 0, 0.1);
-    backdrop-filter: blur(16px);
+    margin-top: 0;
+    box-shadow: none;
+    backdrop-filter: none;
     animation: fadeInDown 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-    margin: 0;
 }
 
 /* Form layout */
 .settings-form {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
+    overflow: visible;
+    position: relative;
 }
 
 /* Field */
 .settings-field {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 3px;
+    position: relative;
+    overflow: visible;
+    contain: layout style;
+    isolation: isolate;
+}
+
+/* Constrain select dropdown width */
+.settings-field select {
+    max-width: 100%;
 }
 .settings-label {
-    font-size: 13px;
+    font-size: 11px;
     color: #D1D5DB; /* match header profile label color */
     font-weight: 500;
 }
@@ -54,16 +57,24 @@
 .settings-select {
     appearance: none;
     -webkit-appearance: none;
-    padding: 10px 12px;
-    font-size: 13px;
+    padding: 8px 30px 8px 10px;
+    font-size: 12px;
     font-weight: 500;
     border: 1px solid #26262A;
-    border-radius: 6px;
+    border-radius: 4px;
     background-color: #1A1A1C;
     color: #D1D5DB;
     outline: none;
     cursor: pointer;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    width: 100%;
+    box-sizing: border-box;
+    min-width: 0;
+    max-width: 100%;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239CA3AF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 12px;
 }
 
 .settings-select:hover {
@@ -72,13 +83,86 @@
 
 .settings-select:focus {
     border-color: #2563EB;
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+    /* Removed blue box-shadow outline */
 }
 
 /* Options */
 .settings-select option {
-    background-color: #1A1A1C;
-    color: #D1D5DB;
+    background-color: #1A1A1C !important;
+    color: #D1D5DB !important;
+    padding: 8px 10px;
+    min-height: 20px;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    box-sizing: border-box;
+    word-wrap: break-word;
+    hyphens: auto;
+}
+
+/* Ensure all option states have dark background - no white background */
+.settings-select option,
+.settings-select option:hover,
+.settings-select option:focus,
+.settings-select option:active,
+.settings-select option:checked,
+.settings-select option[selected] {
+    background-color: #1A1A1C !important;
+    color: #D1D5DB !important;
+}
+
+.settings-select option:hover,
+.settings-select option:focus,
+.settings-select option:active {
+    background-color: #26262A !important;
+    color: #FFFFFF !important;
+}
+
+/* Ensure dropdown list is properly sized */
+.settings-select {
+    position: relative;
+}
+
+/* Constrain dropdown list width */
+.settings-select::-webkit-listbox,
+.settings-select::-moz-listbox,
+.settings-select option {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    background-color: #1A1A1C !important;
+    color: #D1D5DB !important;
+}
+
+/* Override browser defaults for initial dropdown state */
+.settings-select:focus option,
+.settings-select:active option {
+    background-color: #1A1A1C !important;
+    color: #D1D5DB !important;
+}
+
+
+.settings-select::-webkit-listbox {
+    background-color: #1A1A1C !important;
+    border: 1px solid #26262A;
+    border-radius: 4px;
+}
+
+/* Firefox specific styling */
+.settings-select::-moz-listbox {
+    background-color: #1A1A1C !important;
+}
+
+/* Custom dropdown arrow */
+.settings-select {
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239CA3AF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 12px;
+    padding-right: 30px;
 }
 
 /* Disabled select */
@@ -86,29 +170,55 @@
     background-color: #26262A;
     color: #9CA3AF;
     cursor: not-allowed;
+    opacity: 0.7;
+}
+
+/* Loading animation for disabled selects */
+@keyframes loadingPulse {
+    0%, 100% { opacity: 0.7; }
+    50% { opacity: 0.9; }
+}
+
+.settings-select:disabled {
+    animation: loadingPulse 1.5s ease-in-out infinite;
+}
+
+/* Disabled options (placeholders) */
+.settings-select option:disabled {
+    background-color: #1A1A1C !important;
+    color: #9CA3AF !important;
+    font-style: italic;
 }
 
 /* Actions */
 .settings-actions {
     display: flex;
     justify-content: flex-end;
-    margin-top: 8px;
+    margin-top: 6px;
 }
 
 .settings-apply {
     background-color: #2563EB;
     color: #FFFFFF;
     border: none;
-    padding: 8px 14px;
-    font-size: 13px;
+    padding: 6px 12px;
+    font-size: 12px;
     font-weight: 500;
-    border-radius: 6px;
+    border-radius: 4px;
     cursor: pointer;
     transition: all 0.2s ease;
 }
 
-.settings-apply:hover {
+.settings-apply:hover:not(:disabled) {
     background-color: #1D4ED8;
+}
+
+/* Disabled save button */
+.settings-apply:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background-color: #6B7280;
+    color: #9CA3AF;
 }
 
 /* Animations */
@@ -126,9 +236,6 @@
 /* Responsive */
 @media (max-width: 420px) {
     .settings-panel {
-        width: 100vw;
-        left: -8px;
-        right: -8px;
-        border-radius: 1.5px;
+        padding: 10px 12px;
     }
 }

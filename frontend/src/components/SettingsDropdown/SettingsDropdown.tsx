@@ -3,15 +3,24 @@ import axios from 'axios';
 import './SettingsDropdown.css';
 import { useHierarchy } from '../../context/HeirarchyContext.tsx';
 
-export default function SettingsDropdown() {
+interface SettingsDropdownProps {
+    onSave?: () => void;
+}
+
+export default function SettingsDropdown({ onSave }: SettingsDropdownProps) {
     const BASE_BACKEND_URL = "http://localhost:5000/api";
     const [open, setOpen] = useState(true);
     const [collegesData, setCollegesData] = useState<any[]>([]);
     const [departmentsData, setDepartmentsData] = useState<any[]>([]);
     const [semestersData, setSemestersData] = useState<any[]>([]);
-    const [selectedCollege, setSelectedCollege] = useState('');
-    const [selectedDepartment, setSelectedDepartment] = useState('');
-    const [selectedSemester, setSelectedSemester] = useState('');
+    const [selectedCollege, setSelectedCollege] = useState('_placeholder');
+    const [selectedDepartment, setSelectedDepartment] = useState('_placeholder');
+    const [selectedSemester, setSelectedSemester] = useState('_placeholder');
+
+    // Loading states
+    const [loadingColleges, setLoadingColleges] = useState(false);
+    const [loadingDepartments, setLoadingDepartments] = useState(false);
+    const [loadingSemesters, setLoadingSemesters] = useState(false);
     const containerRef = useRef<HTMLDivElement | null>(null);
     const collegeRef = useRef<HTMLSelectElement | null>(null);
     const { setHierarchy,loadCourses } = useHierarchy();
@@ -21,20 +30,20 @@ export default function SettingsDropdown() {
         if (!open) return;
         setTimeout(() => collegeRef.current?.focus(), 0);
 
+        setLoadingColleges(true);
         axios.get(`${BASE_BACKEND_URL}/colleges`, {
             headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
         })
             .then(res => {
                 if (Array.isArray(res.data)) setCollegesData(res.data);
             })
-            .catch(err => console.error(err));
+            .catch(err => console.error(err))
+            .finally(() => setLoadingColleges(false));
     }, [open]);
 
     // Fetch departments when a college is selected
-    // When a college is selected
-    // When a college is selected
     useEffect(() => {
-        if (!selectedCollege) {
+        if (selectedCollege === '_placeholder') {
             setDepartmentsData([]);
             return;
         }
@@ -52,6 +61,7 @@ export default function SettingsDropdown() {
 
         console.log('Found college object:', collegeObj);
 
+        setLoadingDepartments(true);
         axios.get(`${BASE_BACKEND_URL}/departments`, {
             params: { collegeId: collegeObj.id },
             headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
@@ -64,32 +74,41 @@ export default function SettingsDropdown() {
             .catch(err => {
                 console.error("Failed to fetch departments", err.response || err);
                 setDepartmentsData([]);
-            });
+            })
+            .finally(() => setLoadingDepartments(false));
 
-        setSelectedDepartment('');
-        setSelectedSemester('');
+        setSelectedDepartment('_placeholder');
+        setSelectedSemester('_placeholder');
         setSemestersData([]);
-    }, [selectedCollege, collegesData]); // Add collegesData as dependency
+    }, [selectedCollege, collegesData]);
 
 
 
 
     // Fetch semesters when a department is selected
     useEffect(() => {
-        if (!selectedDepartment) return setSemestersData([]);
+        if (selectedDepartment === '_placeholder') {
+            setSemestersData([]);
+            return;
+        }
 
         const deptObj = departmentsData.find(d => d.name === selectedDepartment);
-        if (!deptObj) return setSemestersData([]);
+        if (!deptObj) {
+            setSemestersData([]);
+            return;
+        }
 
+        setLoadingSemesters(true);
         axios.get(`${BASE_BACKEND_URL}/semesters?departmentId=${deptObj.id}`, {
             headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
         })
             .then(res => {
                 if (Array.isArray(res.data)) setSemestersData(res.data);
             })
-            .catch(err => console.error(err));
+            .catch(err => console.error(err))
+            .finally(() => setLoadingSemesters(false));
 
-        setSelectedSemester('');
+        setSelectedSemester('_placeholder');
     }, [selectedDepartment, departmentsData]);
 
     // Close on outside click or Escape
@@ -108,7 +127,14 @@ export default function SettingsDropdown() {
         };
     }, []);
 
+    // Check if all selections are valid (not placeholders)
+    const isFormValid = selectedCollege !== '_placeholder' &&
+                       selectedDepartment !== '_placeholder' &&
+                       selectedSemester !== '_placeholder';
+
     const handleApply = () => {
+        if (!isFormValid) return;
+
         // Find the actual names from the data arrays
         const collegeObj = collegesData.find(c => c.id === Number(selectedCollege));
         const collegeName = collegeObj ? collegeObj.name : selectedCollege;
@@ -131,6 +157,9 @@ export default function SettingsDropdown() {
         }, 100);
 
         setOpen(false);
+
+        // Notify parent to close profile dropdown
+        onSave?.();
     };
 
     return (
@@ -145,10 +174,13 @@ export default function SettingsDropdown() {
                                 id="college-select"
                                 ref={collegeRef}
                                 className="settings-select"
-                                value={selectedCollege}
+                                {...(selectedCollege ? { value: selectedCollege } : {})}
                                 onChange={e => setSelectedCollege(e.target.value)}
+                                disabled={loadingColleges}
                             >
-                                <option value="" disabled>Choose college</option>
+                                <option value="_placeholder" disabled>
+                                    {loadingColleges ? 'Loading colleges...' : 'Choose college'}
+                                </option>
                                 {Array.isArray(collegesData) && collegesData.map(c => (
                                     <option key={c.id} value={c.id}>{c.name}</option>
                                 ))}
@@ -163,9 +195,12 @@ export default function SettingsDropdown() {
                                 className="settings-select"
                                 value={selectedDepartment}
                                 onChange={e => setSelectedDepartment(e.target.value)}
-                                disabled={!departmentsData.length}
+                                disabled={!departmentsData.length || loadingDepartments}
                             >
-                                <option value="" disabled>{departmentsData.length ? 'Choose department' : 'Select college first'}</option>
+                                <option value="_placeholder" disabled>
+                                    {loadingDepartments ? 'Loading departments...' :
+                                     !departmentsData.length ? 'Select college first' : 'Choose department'}
+                                </option>
                                 {Array.isArray(departmentsData) && departmentsData.map(d => (
                                     <option key={d.id} value={d.name}>{d.name}</option>
                                 ))}
@@ -180,9 +215,12 @@ export default function SettingsDropdown() {
                                 className="settings-select"
                                 value={selectedSemester}
                                 onChange={e => setSelectedSemester(e.target.value)}
-                                disabled={!semestersData.length}
+                                disabled={!semestersData.length || loadingSemesters}
                             >
-                                <option value="" disabled>{semestersData.length ? 'Choose semester' : 'Select department first'}</option>
+                                <option value="_placeholder" disabled>
+                                    {loadingSemesters ? 'Loading semesters...' :
+                                     !semestersData.length ? 'Select department first' : 'Choose semester'}
+                                </option>
                                 {Array.isArray(semestersData) && semestersData.map(s => (
                                     <option key={s.id} value={s.name}>{s.name}</option>
                                 ))}
@@ -190,7 +228,13 @@ export default function SettingsDropdown() {
                         </div>
 
                         <div className="settings-actions">
-                            <button type="submit" className="settings-apply">Save</button>
+                            <button
+                                type="submit"
+                                className="settings-apply"
+                                disabled={!isFormValid}
+                            >
+                                Save
+                            </button>
                         </div>
                     </form>
                 </div>

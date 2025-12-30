@@ -219,7 +219,7 @@ const Header: React.FC<HeaderProps> = ({
 
                 {/* SettingsDropdown panel */}
                 {settingsOpen && (
-                  <SettingsDropdown />
+                  <SettingsDropdown onSave={() => setShowProfileDropdown(false)} />
                 )}
               </div>
               <div className="profile-divider"></div>
