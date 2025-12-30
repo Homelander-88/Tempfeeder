@@ -1,14 +1,18 @@
 /* ResetPasswordView component: used when frontend path is /reset-password?token=... */
 import {useState} from "react";
 import { motion} from "framer-motion";
+import './ResetPasswordView.css';
+import { useNavigate } from "react-router-dom";
+
 
 export function ResetPasswordView({ token, onComplete }: { token: string; onComplete: () => void; }) {
     const [password, setPassword] = useState("");
+    const navigate = useNavigate();
     const [confirm, setConfirm] = useState("");
     const [loading, setLoading] = useState(false);
     const [msg, setMsg] = useState<string | null>(null);
     const [err, setErr] = useState<string | null>(null);
-    const API_BASE = (import.meta.env.VITE_API_BASE as string) || "http://localhost:4000/api";
+    const API_BASE = (import.meta.env.VITE_API_BASE as string) || "http://localhost:5000/api";
     const submit = async (e?: React.FormEvent) => {
         e?.preventDefault();
         setErr(null);
@@ -31,7 +35,7 @@ export function ResetPasswordView({ token, onComplete }: { token: string; onComp
             const j = await res.json();
             if (!res.ok) throw new Error(j?.error || "Failed to reset password");
             setMsg("Password reset successful. Redirecting to sign in...");
-            setTimeout(() => onComplete(), 1200);
+            setTimeout(() => navigate("/login"), 1200);
         } catch (e: any) {
             setErr(e?.message || "Server error");
         } finally {
@@ -47,7 +51,7 @@ export function ResetPasswordView({ token, onComplete }: { token: string; onComp
             <input aria-label="New password" type="password" name="password" placeholder="New password" value={password} onChange={(e) => setPassword(e.target.value)} />
             <input aria-label="Confirm new password" type="password" name="confirm" placeholder="Confirm new password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
 
-            <button onClick={submit} disabled={loading}>{loading ? "Saving..." : "Set new password"}</button>
+            <button onClick={submit}  disabled={loading}>{loading ? "Saving..." : "Set new password"}</button>
 
             {err && <div className="error-message" role="alert">{err}</div>}
             {msg && <div className="success-message" role="status">{msg}</div>}
