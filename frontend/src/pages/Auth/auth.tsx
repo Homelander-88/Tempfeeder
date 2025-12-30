@@ -3,6 +3,7 @@ import {motion, AnimatePresence} from "framer-motion";
 import {useAuth} from "../../context/AuthContext";
 import "./auth.css";
 import {ResetPasswordView} from "../../components/ResetPasswordView/ResetPasswordView.tsx";
+
 // Custom SVG Icons
 const InstagramIcon = () => (
     <svg
@@ -61,7 +62,7 @@ interface LoginProps {
 }
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string) || "http://localhost:5000/api";
-// Small email validator
+
 const isValidEmail = (value: string) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 
@@ -78,24 +79,27 @@ function Login({onNavigateToContent, onNavigateToCollegeDepartment, initialMode 
   });
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setMode("normal");
+    e.preventDefault();
     setFormData(prev => ({
       ...prev,
       [e.target.name]: e.target.value
     }));
-    setError("");
+    setError(""); // Clear error when user types
   }, []);
 
   const handleLogin = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
+    setError(""); // Clear any previous errors
 
     try {
       await login(formData);
       onNavigateToContent();
     } catch (err: any) {
       setError(err.response?.data?.error || "Login failed. Please try again.");
+      setMode("error");
     }
-  }, [formData, login]);
+  }, [formData, login, onNavigateToContent]);
 
   const handleRegister = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,15 +118,16 @@ function Login({onNavigateToContent, onNavigateToCollegeDepartment, initialMode 
       onNavigateToCollegeDepartment();
     } catch (err: any) {
       setError(err.response?.data?.error || "Registration failed. Please try again.");
+      setMode("error");
     }
-  }, [formData, register]);
+  }, [formData, register, onNavigateToCollegeDepartment]);
+
   const [showPwd, setShowPwd] = useState(false);
   const [enter, setEnter] = useState(false);
   const [fade, setFade] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>(initialMode);
   const passwordInputRef = useRef<HTMLInputElement>(null);
 
-  //Forgot Password API Integration
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotSuccess, setForgotSuccess] = useState<string | null>(null);
 
@@ -146,7 +151,6 @@ function Login({onNavigateToContent, onNavigateToCollegeDepartment, initialMode 
       if (!res.ok) {
         throw new Error(json?.error || "Failed to send reset email");
       }
-      // success (backend returns generic message)
       setForgotSuccess("If that email exists, a reset link was sent. Check your inbox.");
     } catch (err: any) {
       setError(err?.message || "Server error. Please try again.");
@@ -155,15 +159,13 @@ function Login({onNavigateToContent, onNavigateToCollegeDepartment, initialMode 
     }
   }, [formData.email]);
 
-
-  // Animation variants for side switching
   const leftPanelVariants = {
     login: {
       x: 0,
       opacity: 1
     },
     register: {
-      x: 0, // Text stays in left for register mode
+      x: 0,
       opacity: 1
     }
   };
@@ -174,7 +176,7 @@ function Login({onNavigateToContent, onNavigateToCollegeDepartment, initialMode 
       opacity: 1
     },
     register: {
-      x: 0, // Form stays in right for register mode
+      x: 0,
       opacity: 1
     }
   };
@@ -188,7 +190,6 @@ function Login({onNavigateToContent, onNavigateToCollegeDepartment, initialMode 
     };
   }, []);
 
-  // Re-trigger animations when switching between login and register
   useEffect(() => {
     setFade(false);
     const timer = setTimeout(() => setFade(true), 100);
@@ -197,6 +198,7 @@ function Login({onNavigateToContent, onNavigateToCollegeDepartment, initialMode 
 
   useEffect(() => {
     const moveEyes = (e: MouseEvent) => {
+      e.preventDefault();
       const centerX = window.innerWidth / 2;
       const centerY = window.innerHeight / 2;
 
@@ -213,12 +215,10 @@ function Login({onNavigateToContent, onNavigateToCollegeDepartment, initialMode 
     return () => window.removeEventListener("mousemove", moveEyes);
   }, []);
 
-
   const toggleShowPwd = useCallback(() => {
     setShowPwd(prev => {
       const next = !prev;
       if (!next) {
-        // If hiding password, make sure eyes stay closed
         setMode("password");
         setPeekDoll(null);
       }
@@ -231,18 +231,15 @@ function Login({onNavigateToContent, onNavigateToCollegeDepartment, initialMode 
 
       return next;
     });
-  }, [formData]);
+  }, []);
 
   const urlParams = new URLSearchParams(window.location.search);
   const resetToken = urlParams.get("token");
   const onResetComplete = useCallback(() => {
-    // After successful reset, navigate to login state and show a message
     setAuthMode("login");
     setTimeout(() => setForgotSuccess("Password updated. You can now sign in."), 100);
   }, []);
 
-
-  // If reset token present and on reset path -> render Reset view alone (no dolls/brand)
   if (window.location.pathname === "/reset-password" && resetToken) {
     return (
         <div className="login-page single-view">
@@ -250,9 +247,9 @@ function Login({onNavigateToContent, onNavigateToCollegeDepartment, initialMode 
         </div>
     );
   }
+
   return (
       <div className="login-page">
-        {/* Left Panel - Text (stays on left for both modes) */}
         <motion.div
             className={`brand ${fade ? "fade-in" : ""}`}
             variants={leftPanelVariants}
@@ -296,7 +293,6 @@ function Login({onNavigateToContent, onNavigateToCollegeDepartment, initialMode 
           </AnimatePresence>
         </motion.div>
 
-        {/* Center Panel - Dolls (always stay centered) */}
         <div className="left-panel">
           <div className={`scene ${mode} ${enter ? "enter" : ""}`}>
             <Doll color="purple" size="tall" eye={eye} mode={mode} peek={peekDoll === "purple"} back/>
@@ -306,7 +302,6 @@ function Login({onNavigateToContent, onNavigateToCollegeDepartment, initialMode 
           </div>
         </div>
 
-        {/* Right Panel - Forms (stays on right for both modes) */}
         <motion.div
             className={`right-panel ${fade ? "fade-in" : ""}`}
             variants={rightPanelVariants}
@@ -326,8 +321,14 @@ function Login({onNavigateToContent, onNavigateToCollegeDepartment, initialMode 
                     style={{willChange: 'transform, opacity'}}
                 >
                   <h2 className={fade ? "fade-in" : ""} style={{animationDelay: "0.3s"}}>Welcome back</h2>
-                  <p className="subtitle" style={{animationDelay: "0.4s"}}>Sign in to continue your learning
-                    journey</p>
+                  <p className="subtitle" style={{animationDelay: "0.4s"}}>Sign in to continue your learning journey</p>
+
+                  {/* Show error message if exists */}
+                  {error && (
+                      <div className="error-message" style={{animationDelay: "0.45s"}}>
+                        {error}
+                      </div>
+                  )}
 
                   <input
                       type="email"
@@ -340,7 +341,6 @@ function Login({onNavigateToContent, onNavigateToCollegeDepartment, initialMode 
                       className={fade ? "fade-in" : ""}
                       style={{animationDelay: "0.5s"}}
                   />
-
 
                   <div className="password-wrapper fade-in" style={{animationDelay: "0.6s"}}>
                     <input
@@ -356,7 +356,6 @@ function Login({onNavigateToContent, onNavigateToCollegeDepartment, initialMode 
                         }}
                         onBlur={() => setMode("normal")}
                     />
-
                     <span
                         className="show-pwd"
                         onClick={(e) => {
@@ -365,29 +364,20 @@ function Login({onNavigateToContent, onNavigateToCollegeDepartment, initialMode 
                         }}
                         onMouseDown={(e) => e.preventDefault()}
                     >
-                  {showPwd ? "Hide" : "Show"}
-                </span>
-
+                      {showPwd ? "Hide" : "Show"}
+                    </span>
                   </div>
+
                   <div
                       className={`forgot-password ${fade ? "fade-in" : ""}`}
-                      style={{ animationDelay: "0.7s" }}
-                      onClick={() => setAuthMode("forgot")}
+                      style={{animationDelay: "0.7s"}}
+                      onClick={() => {
+                        setAuthMode("forgot");
+                        setError(""); // Clear error when switching modes
+                      }}
                   >
                     Forgot password?
                   </div>
-
-
-                  {/*<div*/}
-                  {/*    className="forgot-text fade-in"*/}
-                  {/*    style={{ animationDelay: "0.7s" }}*/}
-                  {/*    onClick={() => {*/}
-                  {/*      setAuthMode("forgot");*/}
-                  {/*      setError("");*/}
-                  {/*    }}*/}
-                  {/*>*/}
-                  {/*  Forgot password?*/}
-                  {/*</div>*/}
 
                   <button
                       type="submit"
@@ -398,42 +388,23 @@ function Login({onNavigateToContent, onNavigateToCollegeDepartment, initialMode 
                     {isLoading ? "Signing in..." : "Sign in"}
                   </button>
 
-                  {error && (
-                      <div className="error-message fade-in" style={{animationDelay: "0.7s"}}>
-                        {error}
-                      </div>
-                  )}
-
                   <div className="signup fade-in" style={{animationDelay: "0.9s"}}>
-                    New to Spoonfeeder? <span onClick={() => setAuthMode("register")}>Create account</span>
+                    New to Spoonfeeder? <span onClick={() => {
+                    setAuthMode("register");
+                    setError(""); // Clear error when switching modes
+                  }}>Create account</span>
                   </div>
 
                   <div className="contact-section fade-in" style={{animationDelay: "1s"}}>
                     <div className="contact-label">Contact us</div>
                     <div className="contact-icons">
-                      <a
-                          href="https://instagram.com"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="contact-icon"
-                          aria-label="Instagram"
-                      >
+                      <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="contact-icon" aria-label="Instagram">
                         <InstagramIcon/>
                       </a>
-                      <a
-                          href="mailto:support@spoonfeeder.com"
-                          className="contact-icon"
-                          aria-label="Email"
-                      >
+                      <a href="mailto:support@spoonfeeder.com" className="contact-icon" aria-label="Email">
                         <EmailIcon/>
                       </a>
-                      <a
-                          href="https://wa.me"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="contact-icon"
-                          aria-label="WhatsApp"
-                      >
+                      <a href="https://wa.me" target="_blank" rel="noopener noreferrer" className="contact-icon" aria-label="WhatsApp">
                         <WhatsAppIcon/>
                       </a>
                     </div>
@@ -452,13 +423,9 @@ function Login({onNavigateToContent, onNavigateToCollegeDepartment, initialMode 
                     transition={{duration: 0.4, ease: [0.25, 0.1, 0.25, 1]}}
                     style={{willChange: "transform, opacity"}}
                 >
-                  <h2
-                      className={`email-enter ${fade ? "fade-in" : ""}`}
-                      style={{ animationDelay: "0.3s" }}
-                  >
+                  <h2 className={`email-enter ${fade ? "fade-in" : ""}`} style={{animationDelay: "0.3s"}}>
                     Enter your email
                   </h2>
-
                   <p className={`subtitle ${fade ? "fade-in" : ""}`} style={{animationDelay: "0.4s"}}>
                     We'll send a secure reset link to your inbox
                   </p>
@@ -486,46 +453,32 @@ function Login({onNavigateToContent, onNavigateToCollegeDepartment, initialMode 
                   </button>
 
                   {error && <div className="error-message">{error}</div>}
-                  {forgotSuccess && (
-                      <div className="success-message">{forgotSuccess}</div>
-                  )}
+                  {forgotSuccess && <div className="success-message">{forgotSuccess}</div>}
 
                   <div className={`signup ${fade ? "fade-in" : ""}`} style={{animationDelay: "0.7s"}}>
-                    Remembered your password?{" "}
-                    <span onClick={() => setAuthMode("login")}>Sign in</span>
+                    Remembered your password? <span onClick={() => {
+                    setAuthMode("login");
+                    setError(""); // Clear error when switching modes
+                  }}>Sign in</span>
                   </div>
+
                   <div className={`contact-section ${fade ? "fade-in" : ""}`} style={{animationDelay: "0.8s"}}>
                     <div className="contact-label">Contact us</div>
                     <div className="contact-icons">
-                      <a
-                          href="https://instagram.com"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="contact-icon"
-                          aria-label="Instagram"
-                      >
+                      <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="contact-icon" aria-label="Instagram">
                         <InstagramIcon/>
                       </a>
-                      <a
-                          href="mailto:support@spoonfeeder.com"
-                          className="contact-icon"
-                          aria-label="Email"
-                      >
+                      <a href="mailto:support@spoonfeeder.com" className="contact-icon" aria-label="Email">
                         <EmailIcon/>
                       </a>
-                      <a
-                          href="https://wa.me"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="contact-icon"
-                          aria-label="WhatsApp"
-                      >
+                      <a href="https://wa.me" target="_blank" rel="noopener noreferrer" className="contact-icon" aria-label="WhatsApp">
                         <WhatsAppIcon/>
                       </a>
                     </div>
                   </div>
                 </motion.form>
             )}
+
             {authMode === "register" && (
                 <motion.form
                     key="register-form"
@@ -538,8 +491,14 @@ function Login({onNavigateToContent, onNavigateToCollegeDepartment, initialMode 
                     style={{willChange: 'transform, opacity'}}
                 >
                   <h2 className={fade ? "fade-in" : ""} style={{animationDelay: "0.3s"}}>Create Account</h2>
-                  <p className="subtitle" style={{animationDelay: "0.4s"}}>Sign up to get started with
-                    SpoonFeeder</p>
+                  <p className="subtitle" style={{animationDelay: "0.4s"}}>Sign up to get started with SpoonFeeder</p>
+
+                  {/* Show error message if exists */}
+                  {error && (
+                      <div className="error-message fade-in" style={{animationDelay: "0.45s"}}>
+                        {error}
+                      </div>
+                  )}
 
                   <input
                       type="email"
@@ -574,8 +533,8 @@ function Login({onNavigateToContent, onNavigateToCollegeDepartment, initialMode 
                         }}
                         onMouseDown={(e) => e.preventDefault()}
                     >
-                  {showPwd ? "Hide" : "Show"}
-                </span>
+                      {showPwd ? "Hide" : "Show"}
+                    </span>
                   </div>
 
                   <input
@@ -602,42 +561,23 @@ function Login({onNavigateToContent, onNavigateToCollegeDepartment, initialMode 
                     {isLoading ? "Creating Account..." : "Create Account"}
                   </button>
 
-                  {error && (
-                      <div className="error-message fade-in" style={{animationDelay: "0.7s"}}>
-                        {error}
-                      </div>
-                  )}
-
                   <div className="signup fade-in" style={{animationDelay: "0.9s"}}>
-                    Already have an account? <span onClick={() => setAuthMode("login")}>Sign in</span>
+                    Already have an account? <span onClick={() => {
+                    setAuthMode("login");
+                    setError(""); // Clear error when switching modes
+                  }}>Sign in</span>
                   </div>
 
                   <div className="contact-section fade-in" style={{animationDelay: "1s"}}>
                     <div className="contact-label">Contact us</div>
                     <div className="contact-icons">
-                      <a
-                          href="https://instagram.com"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="contact-icon"
-                          aria-label="Instagram"
-                      >
+                      <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="contact-icon" aria-label="Instagram">
                         <InstagramIcon/>
                       </a>
-                      <a
-                          href="mailto:support@spoonfeeder.com"
-                          className="contact-icon"
-                          aria-label="Email"
-                      >
+                      <a href="mailto:support@spoonfeeder.com" className="contact-icon" aria-label="Email">
                         <EmailIcon/>
                       </a>
-                      <a
-                          href="https://wa.me"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="contact-icon"
-                          aria-label="WhatsApp"
-                      >
+                      <a href="https://wa.me" target="_blank" rel="noopener noreferrer" className="contact-icon" aria-label="WhatsApp">
                         <WhatsAppIcon/>
                       </a>
                     </div>
@@ -650,7 +590,7 @@ function Login({onNavigateToContent, onNavigateToCollegeDepartment, initialMode 
   );
 }
 
-export default Login
+export default Login;
 
 interface DollProps {
   color: string;
@@ -685,7 +625,6 @@ function Doll({color, size, eye, mode, peek, back, front, side}: DollProps) {
           <span/>
           <span/>
         </div>
-
         <div className={`mouth ${isError ? "error" : ""}`}/>
       </div>
   );

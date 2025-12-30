@@ -22,8 +22,8 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isAdmin: boolean;
   isLoading: boolean;
-  login: (data: LoginData) => Promise<void>;
-  register: (data: RegisterData) => Promise<void>;
+  login: (data: LoginData) => Promise<boolean>;
+  register: (data: RegisterData) => Promise<boolean>;
   logout: () => void;
 }
 
@@ -62,26 +62,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setIsLoading(false);
   }, []);
 
-  const handleLogin = async (data: LoginData) => {
+  const handleLogin = async (data: LoginData): Promise<boolean> => {
     try {
-      setIsLoading(true);
       const response: AuthResponse = await login(data);
 
       setToken(response.token);
       setUser(response.user);
 
-      // Store in localStorage
       localStorage.setItem('token', response.token);
       localStorage.setItem('user', JSON.stringify(response.user));
+
+      return true; // ✅ success signal
     } catch (error) {
       console.error('Login failed:', error);
-      throw error;
+      throw error; // UI will handle error display
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleRegister = async (data: RegisterData) => {
+  const handleRegister = async (data: RegisterData): Promise<boolean> => {
     try {
       setIsLoading(true);
       const response: AuthResponse = await register(data);
@@ -89,9 +89,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setToken(response.token);
       setUser(response.user);
 
-      // Store in localStorage
       localStorage.setItem('token', response.token);
       localStorage.setItem('user', JSON.stringify(response.user));
+
+      return true;
     } catch (error) {
       console.error('Registration failed:', error);
       throw error;
@@ -99,6 +100,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setIsLoading(false);
     }
   };
+
 
   const handleLogout = () => {
     setToken(null);

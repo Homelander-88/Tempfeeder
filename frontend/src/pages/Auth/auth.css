@@ -609,15 +609,16 @@ input[type="password"]::-webkit-clear-button {
 
 .error-message {
   color: #ef4444;
-  font-size: 0.9rem;
+  font-size: 0.92rem;
   text-align: center;
-  margin-top: 12px;
-  padding: 8px 12px;
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.18);
   border-radius: 8px;
-  animation: errorShake 0.5s ease-in-out;
+  animation: errorShake 0.45s ease-in-out;
 }
+
 
 @keyframes errorShake {
   0%, 100% {
@@ -651,18 +652,6 @@ input[type="password"]::-webkit-clear-button {
 .signup span {
   color: var(--primary-accent);
   cursor: pointer
-}
-
-.error-message {
-  color: #ef4444;
-  font-size: 0.92rem;
-  text-align: center;
-  margin-top: 8px;
-  padding: 8px 12px;
-  background: rgba(239, 68, 68, 0.06);
-  border: 1px solid rgba(239, 68, 68, 0.14);
-  border-radius: 8px;
-  animation: errorShake .5s
 }
 
 .success-message {
