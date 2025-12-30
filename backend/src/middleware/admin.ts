@@ -6,7 +6,13 @@ const ADMIN_EMAILS = [
   'ruhankb29@gmail.com',
   'prasanthsri542@gmail.com',
   'sunshine.sankum@gmail.com',
-  'suganthr09@gmail.com'
+  'suganthr09@gmail.com',
+  'mkavin1106@gmail.com',
+  'ssanthoshcse44@gmail.com',
+  'nithi4527@gmail.com',
+  'dnaveenprabu2007@gmail.com',
+  'nithishkumar1642006@gmail.com',
+  'sanjithsvpm@gmail.com'
 ];
 
 interface DecodedToken {

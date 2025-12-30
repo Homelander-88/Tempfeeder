@@ -61,7 +61,7 @@ interface LoginProps {
   initialMode?: "login" | "register";
 }
 
-const API_BASE = (import.meta.env.VITE_API_BASE as string) || "http://localhost:5000/api";
+const API_BASE = (import.meta.env.VITE_API_BASE as string) || "https://spoonfeeder.onrender.com/api";
 
 const isValidEmail = (value: string) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
