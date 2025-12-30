@@ -431,6 +431,13 @@
 }
 
 /* ================= Settings Button ================= */
+.settings-container {
+  position: relative;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
 .settings-btn {
   display: flex;
   align-items: center;
@@ -445,6 +452,7 @@
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   border-radius: 0;
+  margin: 0;
 }
 
 .settings-btn:hover {
