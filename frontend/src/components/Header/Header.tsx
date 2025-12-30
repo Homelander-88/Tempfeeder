@@ -9,7 +9,6 @@ interface HeaderProps {
   email?: string;
   onNavigate?: (path: string) => void;
   onModeChange?: (mode: "deep" | "normal" | "rush") => void;
-  onAdminToggle?: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -17,10 +16,9 @@ const Header: React.FC<HeaderProps> = ({
   onLogout,
   username: usernameProp,
   email: emailProp,
-  onModeChange,
-  onAdminToggle
+  onModeChange
 }) => {
-  const { user, logout: authLogout, isAdmin } = useAuth();
+  const { user, logout: authLogout } = useAuth();
   
   // Use actual user data from AuthContext, fallback to props if provided
   const email = user?.email || emailProp || "user@example.com";
@@ -43,9 +41,9 @@ const Header: React.FC<HeaderProps> = ({
   const [currentMode, setCurrentMode] = useState<"deep" | "normal" | "rush">("normal");
 
   const modeLabel = {
-    deep: "Deep mode",
-    normal: "Normal mode",
-    rush: "Rush mode"
+    deep: "Deep Focus",
+    normal: "Normal",
+    rush: "Quick Review"
   };
 
   const handleModeSelect = (mode: "deep" | "normal" | "rush") => {
@@ -145,30 +143,17 @@ const Header: React.FC<HeaderProps> = ({
           {modeDropdownOpen && (
             <div className="mode-dropdown-menu">
               <div onClick={() => handleModeSelect("deep")}>
-                Deep mode
+                Deep Focus
               </div>
               <div onClick={() => handleModeSelect("normal")}>
-                Normal mode
+                Normal
               </div>
               <div onClick={() => handleModeSelect("rush")}>
-                Rush mode
+                Quick Review
               </div>
             </div>
           )}
         </div>
-
-        {/* Admin Button - Only show for admin users */}
-        {isAdmin && (
-          <button
-            className="admin-btn"
-            onClick={onAdminToggle}
-            title="Admin Panel"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 1l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 1z"/>
-            </svg>
-          </button>
-        )}
 
         {/* User Profile Dropdown */}
         <div className="user-profile" ref={profileDropdownRef}>

@@ -66,588 +66,588 @@ const isValidEmail = (value: string) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 
 function Login({onNavigateToContent, onNavigateToCollegeDepartment, initialMode = "login"}: LoginProps) {
-  const {login, register, isLoading} = useAuth();
-  const [eye, setEye] = useState({x: 0, y: 0});
-  const [mode, setMode] = useState<Mode>("normal");
-  const [peekDoll, setPeekDoll] = useState<string | null>(null);
-  const [error, setError] = useState<string>("");
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-    confirmPassword: ""
-  });
-
-  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData(prev => ({
-      ...prev,
-      [e.target.name]: e.target.value
-    }));
-    setError("");
-  }, []);
-
-  const handleLogin = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-
-    try {
-      await login(formData);
-      onNavigateToContent();
-    } catch (err: any) {
-      setError(err.response?.data?.error || "Login failed. Please try again.");
-    }
-  }, [formData, login]);
-
-  const handleRegister = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-
-    if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match");
-      return;
-    }
-
-    try {
-      await register({
-        email: formData.email,
-        password: formData.password
-      });
-      onNavigateToCollegeDepartment();
-    } catch (err: any) {
-      setError(err.response?.data?.error || "Registration failed. Please try again.");
-    }
-  }, [formData, register]);
-  const [showPwd, setShowPwd] = useState(false);
-  const [enter, setEnter] = useState(false);
-  const [fade, setFade] = useState(false);
-  const [authMode, setAuthMode] = useState<AuthMode>(initialMode);
-  const passwordInputRef = useRef<HTMLInputElement>(null);
-
-  //Forgot Password API Integration
-  const [forgotLoading, setForgotLoading] = useState(false);
-  const [forgotSuccess, setForgotSuccess] = useState<string | null>(null);
-
-  const sendResetEmail = useCallback(async (e?: React.FormEvent) => {
-    e?.preventDefault();
-    setError("");
-    setForgotSuccess(null);
-    if (!isValidEmail(formData.email)) {
-      setError("Please enter a valid email");
-      return;
-    }
-
-    try {
-      setForgotLoading(true);
-      const res = await fetch(`${API_BASE}/auth/forgot-password`, {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({email: formData.email})
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json?.error || "Failed to send reset email");
-      }
-      // success (backend returns generic message)
-      setForgotSuccess("If that email exists, a reset link was sent. Check your inbox.");
-    } catch (err: any) {
-      setError(err?.message || "Server error. Please try again.");
-    } finally {
-      setForgotLoading(false);
-    }
-  }, [formData.email]);
-
-
-  // Animation variants for side switching
-  const leftPanelVariants = {
-    login: {
-      x: 0,
-      opacity: 1
-    },
-    register: {
-      x: 0, // Text stays in left for register mode
-      opacity: 1
-    }
-  };
-
-  const rightPanelVariants = {
-    login: {
-      x: 0,
-      opacity: 1
-    },
-    register: {
-      x: 0, // Form stays in right for register mode
-      opacity: 1
-    }
-  };
-
-  useEffect(() => {
-    const t1 = setTimeout(() => setEnter(true), 100);
-    const t2 = setTimeout(() => setFade(true), 300);
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-    };
-  }, []);
-
-  // Re-trigger animations when switching between login and register
-  useEffect(() => {
-    setFade(false);
-    const timer = setTimeout(() => setFade(true), 100);
-    return () => clearTimeout(timer);
-  }, [authMode]);
-
-  useEffect(() => {
-    const moveEyes = (e: MouseEvent) => {
-      const centerX = window.innerWidth / 2;
-      const centerY = window.innerHeight / 2;
-
-      let dx = (e.clientX - centerX) / 80;
-      let dy = (e.clientY - centerY) / 80;
-
-      dx = Math.max(-8, Math.min(8, dx));
-      dy = Math.max(-6, Math.min(6, dy));
-
-      setEye({x: dx, y: dy});
-    };
-
-    window.addEventListener("mousemove", moveEyes);
-    return () => window.removeEventListener("mousemove", moveEyes);
-  }, []);
-
-
-  const toggleShowPwd = useCallback(() => {
-    setShowPwd(prev => {
-      const next = !prev;
-      if (!next) {
-        // If hiding password, make sure eyes stay closed
-        setMode("password");
-        setPeekDoll(null);
-      }
-
-      setTimeout(() => {
-        if (passwordInputRef.current) {
-          passwordInputRef.current.focus();
-        }
-      }, 0);
-
-      return next;
+    const {login, register, isLoading} = useAuth();
+    const [eye, setEye] = useState({x: 0, y: 0});
+    const [mode, setMode] = useState<Mode>("normal");
+    const [peekDoll, setPeekDoll] = useState<string | null>(null);
+    const [error, setError] = useState<string>("");
+    const [formData, setFormData] = useState({
+        email: "",
+        password: "",
+        confirmPassword: ""
     });
-  }, [formData]);
 
-  const urlParams = new URLSearchParams(window.location.search);
-  const resetToken = urlParams.get("token");
-  const onResetComplete = useCallback(() => {
-    // After successful reset, navigate to login state and show a message
-    setAuthMode("login");
-    setTimeout(() => setForgotSuccess("Password updated. You can now sign in."), 100);
-  }, []);
+    const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        setFormData(prev => ({
+            ...prev,
+            [e.target.name]: e.target.value
+        }));
+        setError("");
+    }, []);
+
+    const handleLogin = useCallback(async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError("");
+
+        try {
+            await login({email:formData.email,password:formData.password});
+            onNavigateToContent();
+        } catch (err: any) {
+            setError(err.response?.data?.error || "Login failed. Please try again.");
+        }
+    }, [formData, login]);
+
+    const handleRegister = useCallback(async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError("");
+
+        if (formData.password !== formData.confirmPassword) {
+            setError("Passwords do not match");
+            return;
+        }
+
+        try {
+            await register({
+                email: formData.email,
+                password: formData.password
+            });
+            onNavigateToCollegeDepartment();
+        } catch (err: any) {
+            setError(err.response?.data?.error || "Registration failed. Please try again.");
+        }
+    }, [formData, register]);
+    const [showPwd, setShowPwd] = useState(false);
+    const [enter, setEnter] = useState(false);
+    const [fade, setFade] = useState(false);
+    const [authMode, setAuthMode] = useState<AuthMode>(initialMode);
+    const passwordInputRef = useRef<HTMLInputElement>(null);
+
+    //Forgot Password API Integration
+    const [forgotLoading, setForgotLoading] = useState(false);
+    const [forgotSuccess, setForgotSuccess] = useState<string | null>(null);
+
+    const sendResetEmail = useCallback(async (e?: React.FormEvent) => {
+        e?.preventDefault();
+        setError("");
+        setForgotSuccess(null);
+        if (!isValidEmail(formData.email)) {
+            setError("Please enter a valid email");
+            return;
+        }
+
+        try {
+            setForgotLoading(true);
+            const res = await fetch(`${API_BASE}/auth/forgot-password`, {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({email: formData.email})
+            });
+            const json = await res.json();
+            if (!res.ok) {
+                throw new Error(json?.error || "Failed to send reset email");
+            }
+            // success (backend returns generic message)
+            setForgotSuccess("If that email exists, a reset link was sent. Check your inbox.");
+        } catch (err: any) {
+            setError(err?.message || "Server error. Please try again.");
+        } finally {
+            setForgotLoading(false);
+        }
+    }, [formData.email]);
 
 
-  // If reset token present and on reset path -> render Reset view alone (no dolls/brand)
-  if (window.location.pathname === "/reset-password" && resetToken) {
+    // Animation variants for side switching
+    const leftPanelVariants = {
+        login: {
+            x: 0,
+            opacity: 1
+        },
+        register: {
+            x: 0, // Text stays in left for register mode
+            opacity: 1
+        }
+    };
+
+    const rightPanelVariants = {
+        login: {
+            x: 0,
+            opacity: 1
+        },
+        register: {
+            x: 0, // Form stays in right for register mode
+            opacity: 1
+        }
+    };
+
+    useEffect(() => {
+        const t1 = setTimeout(() => setEnter(true), 100);
+        const t2 = setTimeout(() => setFade(true), 300);
+        return () => {
+            clearTimeout(t1);
+            clearTimeout(t2);
+        };
+    }, []);
+
+    // Re-trigger animations when switching between login and register
+    useEffect(() => {
+        setFade(false);
+        const timer = setTimeout(() => setFade(true), 100);
+        return () => clearTimeout(timer);
+    }, [authMode]);
+
+    useEffect(() => {
+        const moveEyes = (e: MouseEvent) => {
+            const centerX = window.innerWidth / 2;
+            const centerY = window.innerHeight / 2;
+
+            let dx = (e.clientX - centerX) / 80;
+            let dy = (e.clientY - centerY) / 80;
+
+            dx = Math.max(-8, Math.min(8, dx));
+            dy = Math.max(-6, Math.min(6, dy));
+
+            setEye({x: dx, y: dy});
+        };
+
+        window.addEventListener("mousemove", moveEyes);
+        return () => window.removeEventListener("mousemove", moveEyes);
+    }, []);
+
+
+    const toggleShowPwd = useCallback(() => {
+        setShowPwd(prev => {
+            const next = !prev;
+            if (!next) {
+                // If hiding password, make sure eyes stay closed
+                setMode("password");
+                setPeekDoll(null);
+            }
+
+            setTimeout(() => {
+                if (passwordInputRef.current) {
+                    passwordInputRef.current.focus();
+                }
+            }, 0);
+
+            return next;
+        });
+    }, [formData]);
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const resetToken = urlParams.get("token");
+    const onResetComplete = useCallback(() => {
+        // After successful reset, navigate to login state and show a message
+        setAuthMode("login");
+        setTimeout(() => setForgotSuccess("Password updated. You can now sign in."), 100);
+    }, []);
+
+
+    // If reset token present and on reset path -> render Reset view alone (no dolls/brand)
+    if (window.location.pathname === "/reset-password" && resetToken) {
+        return (
+            <div className="login-page single-view">
+                <ResetPasswordView token={resetToken} onComplete={onResetComplete}/>
+            </div>
+        );
+    }
     return (
-        <div className="login-page single-view">
-          <ResetPasswordView token={resetToken} onComplete={onResetComplete}/>
+        <div className="login-page">
+            {/* Left Panel - Text (stays on left for both modes) */}
+            <motion.div
+                className={`brand ${fade ? "fade-in" : ""}`}
+                variants={leftPanelVariants}
+                animate={authMode}
+                initial="login"
+            >
+                <AnimatePresence mode="wait" initial={false}>
+                    {authMode === "login" ? (
+                        <motion.div
+                            key="login-text"
+                            initial={{x: -50, opacity: 0}}
+                            animate={{x: 0, opacity: 1}}
+                            exit={{x: 50, opacity: 0}}
+                            transition={{duration: 0.4, ease: [0.25, 0.1, 0.25, 1]}}
+                            style={{willChange: 'transform, opacity'}}
+                        >
+                            <div className="brand-title">Spoonfeeder</div>
+                            <div className="brand-hero">
+                                Structured learning<br/>
+                                Zero Distraction
+                                <span className="brand-subtitle">Learn what matters. Nothing else.</span>
+                            </div>
+                        </motion.div>
+                    ) : (
+                        <motion.div
+                            key="register-text"
+                            initial={{x: -50, opacity: 0}}
+                            animate={{x: 0, opacity: 1}}
+                            exit={{x: 50, opacity: 0}}
+                            transition={{duration: 0.4, ease: [0.25, 0.1, 0.25, 1]}}
+                            style={{willChange: 'transform, opacity'}}
+                        >
+                            <div className="brand-title">Spoonfeeder</div>
+                            <div className="brand-hero">
+                                Start your journey<br/>
+                                Create your account
+                                <span className="brand-subtitle">Structured learning awaits.</span>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            </motion.div>
+
+            {/* Center Panel - Dolls (always stay centered) */}
+            <div className="left-panel">
+                <div className={`scene ${mode} ${enter ? "enter" : ""}`}>
+                    <Doll color="purple" size="tall" eye={eye} mode={mode} peek={peekDoll === "purple"} back/>
+                    <Doll color="pink" size="medium" eye={eye} mode={mode} peek={peekDoll === "pink"}/>
+                    <Doll color="orange" size="round" eye={eye} mode={mode} peek={peekDoll === "orange"} front/>
+                    <Doll color="yellow" size="pill" eye={eye} mode={mode} peek={peekDoll === "yellow"} side/>
+                </div>
+            </div>
+
+            {/* Right Panel - Forms (stays on right for both modes) */}
+            <motion.div
+                className={`right-panel ${fade ? "fade-in" : ""}`}
+                variants={rightPanelVariants}
+                animate={authMode}
+                initial="login"
+            >
+                <AnimatePresence mode="wait" initial={false}>
+                    {authMode === "login" && (
+                        <motion.form
+                            key="login-form"
+                            className="login-card"
+                            onSubmit={handleLogin}
+                            initial={{x: -50, opacity: 0}}
+                            animate={{x: 0, opacity: 1}}
+                            exit={{x: 50, opacity: 0}}
+                            transition={{duration: 0.4, ease: [0.25, 0.1, 0.25, 1]}}
+                            style={{willChange: 'transform, opacity'}}
+                        >
+                            <h2 className={fade ? "fade-in" : ""} style={{animationDelay: "0.3s"}}>Welcome back</h2>
+                            <p className="subtitle" style={{animationDelay: "0.4s"}}>Sign in to continue your learning
+                                journey</p>
+
+                            <input
+                                type="email"
+                                name="email"
+                                placeholder="Email"
+                                value={formData.email}
+                                onChange={handleInputChange}
+                                onFocus={() => setMode("email")}
+                                onBlur={() => setMode("normal")}
+                                className={fade ? "fade-in" : ""}
+                                style={{animationDelay: "0.5s"}}
+                            />
+
+
+                            <div className="password-wrapper fade-in" style={{animationDelay: "0.6s"}}>
+                                <input
+                                    ref={passwordInputRef}
+                                    type={showPwd ? "text" : "password"}
+                                    name="password"
+                                    placeholder="Password"
+                                    value={formData.password}
+                                    onChange={handleInputChange}
+                                    onFocus={() => {
+                                        setMode("password");
+                                        setPeekDoll(null);
+                                    }}
+                                    onBlur={() => setMode("normal")}
+                                />
+
+                                <span
+                                    className="show-pwd"
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        toggleShowPwd();
+                                    }}
+                                    onMouseDown={(e) => e.preventDefault()}
+                                >
+                  {showPwd ? "Hide" : "Show"}
+                </span>
+
+                            </div>
+                            <div
+                                className={`forgot-password ${fade ? "fade-in" : ""}`}
+                                style={{ animationDelay: "0.7s" }}
+                                onClick={() => setAuthMode("forgot")}
+                            >
+                                Forgot password?
+                            </div>
+
+
+                            {/*<div*/}
+                            {/*    className="forgot-text fade-in"*/}
+                            {/*    style={{ animationDelay: "0.7s" }}*/}
+                            {/*    onClick={() => {*/}
+                            {/*      setAuthMode("forgot");*/}
+                            {/*      setError("");*/}
+                            {/*    }}*/}
+                            {/*>*/}
+                            {/*  Forgot password?*/}
+                            {/*</div>*/}
+
+                            <button
+                                type="submit"
+                                className="fade-in"
+                                style={{animationDelay: "0.8s"}}
+                                disabled={isLoading}
+                            >
+                                {isLoading ? "Signing in..." : "Sign in"}
+                            </button>
+
+                            {error && (
+                                <div className="error-message fade-in" style={{animationDelay: "0.7s"}}>
+                                    {error}
+                                </div>
+                            )}
+
+                            <div className="signup fade-in" style={{animationDelay: "0.9s"}}>
+                                New to Spoonfeeder? <span onClick={() => setAuthMode("register")}>Create account</span>
+                            </div>
+
+                            <div className="contact-section fade-in" style={{animationDelay: "1s"}}>
+                                <div className="contact-label">Contact us</div>
+                                <div className="contact-icons">
+                                    <a
+                                        href="https://instagram.com"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="contact-icon"
+                                        aria-label="Instagram"
+                                    >
+                                        <InstagramIcon/>
+                                    </a>
+                                    <a
+                                        href="mailto:support@spoonfeeder.com"
+                                        className="contact-icon"
+                                        aria-label="Email"
+                                    >
+                                        <EmailIcon/>
+                                    </a>
+                                    <a
+                                        href="https://wa.me"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="contact-icon"
+                                        aria-label="WhatsApp"
+                                    >
+                                        <WhatsAppIcon/>
+                                    </a>
+                                </div>
+                            </div>
+                        </motion.form>
+                    )}
+
+                    {authMode === "forgot" && (
+                        <motion.form
+                            key="forgot-form"
+                            className="login-card"
+                            initial={{x: -50, opacity: 0}}
+                            animate={{x: 0, opacity: 1}}
+                            exit={{x: 50, opacity: 0}}
+                            onSubmit={sendResetEmail}
+                            transition={{duration: 0.4, ease: [0.25, 0.1, 0.25, 1]}}
+                            style={{willChange: "transform, opacity"}}
+                        >
+                            <h2
+                                className={`email-enter ${fade ? "fade-in" : ""}`}
+                                style={{ animationDelay: "0.3s" }}
+                            >
+                                Enter your email
+                            </h2>
+
+                            <p className={`subtitle ${fade ? "fade-in" : ""}`} style={{animationDelay: "0.4s"}}>
+                                We'll send a secure reset link to your inbox
+                            </p>
+
+                            <input
+                                type="email"
+                                name="email"
+                                placeholder="Email"
+                                value={formData.email}
+                                onChange={handleInputChange}
+                                onFocus={() => setMode("email")}
+                                onBlur={() => setMode("normal")}
+                                autoComplete="email"
+                                className={fade ? "fade-in" : ""}
+                                style={{animationDelay: "0.5s"}}
+                            />
+
+                            <button
+                                type="submit"
+                                disabled={forgotLoading}
+                                className={fade ? "fade-in" : ""}
+                                style={{animationDelay: "0.6s"}}
+                            >
+                                {forgotLoading ? "Sending..." : "Send Reset Email"}
+                            </button>
+
+                            {error && <div className="error-message">{error}</div>}
+                            {forgotSuccess && (
+                                <div className="success-message">{forgotSuccess}</div>
+                            )}
+
+                            <div className={`signup ${fade ? "fade-in" : ""}`} style={{animationDelay: "0.7s"}}>
+                                Remembered your password?{" "}
+                                <span onClick={() => setAuthMode("login")}>Sign in</span>
+                            </div>
+                            <div className={`contact-section ${fade ? "fade-in" : ""}`} style={{animationDelay: "0.8s"}}>
+                                <div className="contact-label">Contact us</div>
+                                <div className="contact-icons">
+                                    <a
+                                        href="https://instagram.com"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="contact-icon"
+                                        aria-label="Instagram"
+                                    >
+                                        <InstagramIcon/>
+                                    </a>
+                                    <a
+                                        href="mailto:support@spoonfeeder.com"
+                                        className="contact-icon"
+                                        aria-label="Email"
+                                    >
+                                        <EmailIcon/>
+                                    </a>
+                                    <a
+                                        href="https://wa.me"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="contact-icon"
+                                        aria-label="WhatsApp"
+                                    >
+                                        <WhatsAppIcon/>
+                                    </a>
+                                </div>
+                            </div>
+                        </motion.form>
+                    )}
+                    {authMode === "register" && (
+                        <motion.form
+                            key="register-form"
+                            className="login-card"
+                            onSubmit={handleRegister}
+                            initial={{x: -50, opacity: 0}}
+                            animate={{x: 0, opacity: 1}}
+                            exit={{x: 50, opacity: 0}}
+                            transition={{duration: 0.4, ease: [0.25, 0.1, 0.25, 1]}}
+                            style={{willChange: 'transform, opacity'}}
+                        >
+                            <h2 className={fade ? "fade-in" : ""} style={{animationDelay: "0.3s"}}>Create Account</h2>
+                            <p className="subtitle" style={{animationDelay: "0.4s"}}>Sign up to get started with
+                                SpoonFeeder</p>
+
+                            <input
+                                type="email"
+                                name="email"
+                                placeholder="Email"
+                                value={formData.email}
+                                onChange={handleInputChange}
+                                onFocus={() => setMode("email")}
+                                onBlur={() => setMode("normal")}
+                                className={fade ? "fade-in" : ""}
+                                style={{animationDelay: "0.5s"}}
+                            />
+
+                            <div className="password-wrapper fade-in" style={{animationDelay: "0.6s"}}>
+                                <input
+                                    type={showPwd ? "text" : "password"}
+                                    name="password"
+                                    placeholder="Password"
+                                    value={formData.password}
+                                    onChange={handleInputChange}
+                                    onFocus={() => {
+                                        setMode("password");
+                                        setPeekDoll(null);
+                                    }}
+                                    onBlur={() => setMode("normal")}
+                                />
+                                <span
+                                    className="show-pwd"
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        toggleShowPwd();
+                                    }}
+                                    onMouseDown={(e) => e.preventDefault()}
+                                >
+                  {showPwd ? "Hide" : "Show"}
+                </span>
+                            </div>
+
+                            <input
+                                type="password"
+                                name="confirmPassword"
+                                placeholder="Confirm Password"
+                                value={formData.confirmPassword}
+                                onChange={handleInputChange}
+                                onFocus={() => {
+                                    setMode("password");
+                                    setPeekDoll(null);
+                                }}
+                                onBlur={() => setMode("normal")}
+                                className={fade ? "fade-in" : ""}
+                                style={{animationDelay: "0.7s"}}
+                            />
+
+                            <button
+                                type="submit"
+                                className="fade-in"
+                                style={{animationDelay: "0.8s"}}
+                                disabled={isLoading}
+                            >
+                                {isLoading ? "Creating Account..." : "Create Account"}
+                            </button>
+
+                            {error && (
+                                <div className="error-message fade-in" style={{animationDelay: "0.7s"}}>
+                                    {error}
+                                </div>
+                            )}
+
+                            <div className="signup fade-in" style={{animationDelay: "0.9s"}}>
+                                Already have an account? <span onClick={() => setAuthMode("login")}>Sign in</span>
+                            </div>
+
+                            <div className="contact-section fade-in" style={{animationDelay: "1s"}}>
+                                <div className="contact-label">Contact us</div>
+                                <div className="contact-icons">
+                                    <a
+                                        href="https://instagram.com"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="contact-icon"
+                                        aria-label="Instagram"
+                                    >
+                                        <InstagramIcon/>
+                                    </a>
+                                    <a
+                                        href="mailto:support@spoonfeeder.com"
+                                        className="contact-icon"
+                                        aria-label="Email"
+                                    >
+                                        <EmailIcon/>
+                                    </a>
+                                    <a
+                                        href="https://wa.me"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="contact-icon"
+                                        aria-label="WhatsApp"
+                                    >
+                                        <WhatsAppIcon/>
+                                    </a>
+                                </div>
+                            </div>
+                        </motion.form>
+                    )}
+                </AnimatePresence>
+            </motion.div>
         </div>
     );
-  }
-  return (
-      <div className="login-page">
-        {/* Left Panel - Text (stays on left for both modes) */}
-        <motion.div
-            className={`brand ${fade ? "fade-in" : ""}`}
-            variants={leftPanelVariants}
-            animate={authMode}
-            initial="login"
-        >
-          <AnimatePresence mode="wait" initial={false}>
-            {authMode === "login" ? (
-                <motion.div
-                    key="login-text"
-                    initial={{x: -50, opacity: 0}}
-                    animate={{x: 0, opacity: 1}}
-                    exit={{x: 50, opacity: 0}}
-                    transition={{duration: 0.4, ease: [0.25, 0.1, 0.25, 1]}}
-                    style={{willChange: 'transform, opacity'}}
-                >
-                  <div className="brand-title">Spoonfeeder</div>
-                  <div className="brand-hero">
-                    Structured learning<br/>
-                    Zero Distraction
-                    <span className="brand-subtitle">Learn what matters. Nothing else.</span>
-                  </div>
-                </motion.div>
-            ) : (
-                <motion.div
-                    key="register-text"
-                    initial={{x: -50, opacity: 0}}
-                    animate={{x: 0, opacity: 1}}
-                    exit={{x: 50, opacity: 0}}
-                    transition={{duration: 0.4, ease: [0.25, 0.1, 0.25, 1]}}
-                    style={{willChange: 'transform, opacity'}}
-                >
-                  <div className="brand-title">Spoonfeeder</div>
-                  <div className="brand-hero">
-                    Start your journey<br/>
-                    Create your account
-                    <span className="brand-subtitle">Structured learning awaits.</span>
-                  </div>
-                </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
-
-        {/* Center Panel - Dolls (always stay centered) */}
-        <div className="left-panel">
-          <div className={`scene ${mode} ${enter ? "enter" : ""}`}>
-            <Doll color="purple" size="tall" eye={eye} mode={mode} peek={peekDoll === "purple"} back/>
-            <Doll color="pink" size="medium" eye={eye} mode={mode} peek={peekDoll === "pink"}/>
-            <Doll color="orange" size="round" eye={eye} mode={mode} peek={peekDoll === "orange"} front/>
-            <Doll color="yellow" size="pill" eye={eye} mode={mode} peek={peekDoll === "yellow"} side/>
-          </div>
-        </div>
-
-        {/* Right Panel - Forms (stays on right for both modes) */}
-        <motion.div
-            className={`right-panel ${fade ? "fade-in" : ""}`}
-            variants={rightPanelVariants}
-            animate={authMode}
-            initial="login"
-        >
-          <AnimatePresence mode="wait" initial={false}>
-            {authMode === "login" && (
-                <motion.form
-                    key="login-form"
-                    className="login-card"
-                    onSubmit={handleLogin}
-                    initial={{x: -50, opacity: 0}}
-                    animate={{x: 0, opacity: 1}}
-                    exit={{x: 50, opacity: 0}}
-                    transition={{duration: 0.4, ease: [0.25, 0.1, 0.25, 1]}}
-                    style={{willChange: 'transform, opacity'}}
-                >
-                  <h2 className={fade ? "fade-in" : ""} style={{animationDelay: "0.3s"}}>Welcome back</h2>
-                  <p className="subtitle" style={{animationDelay: "0.4s"}}>Sign in to continue your learning
-                    journey</p>
-
-                  <input
-                      type="email"
-                      name="email"
-                      placeholder="Email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      onFocus={() => setMode("email")}
-                      onBlur={() => setMode("normal")}
-                      className={fade ? "fade-in" : ""}
-                      style={{animationDelay: "0.5s"}}
-                  />
-
-
-                  <div className="password-wrapper fade-in" style={{animationDelay: "0.6s"}}>
-                    <input
-                        ref={passwordInputRef}
-                        type={showPwd ? "text" : "password"}
-                        name="password"
-                        placeholder="Password"
-                        value={formData.password}
-                        onChange={handleInputChange}
-                        onFocus={() => {
-                          setMode("password");
-                          setPeekDoll(null);
-                        }}
-                        onBlur={() => setMode("normal")}
-                    />
-
-                    <span
-                        className="show-pwd"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          toggleShowPwd();
-                        }}
-                        onMouseDown={(e) => e.preventDefault()}
-                    >
-                  {showPwd ? "Hide" : "Show"}
-                </span>
-
-                  </div>
-                  <div
-                      className={`forgot-password ${fade ? "fade-in" : ""}`}
-                      style={{ animationDelay: "0.7s" }}
-                      onClick={() => setAuthMode("forgot")}
-                  >
-                    Forgot password?
-                  </div>
-
-
-                  {/*<div*/}
-                  {/*    className="forgot-text fade-in"*/}
-                  {/*    style={{ animationDelay: "0.7s" }}*/}
-                  {/*    onClick={() => {*/}
-                  {/*      setAuthMode("forgot");*/}
-                  {/*      setError("");*/}
-                  {/*    }}*/}
-                  {/*>*/}
-                  {/*  Forgot password?*/}
-                  {/*</div>*/}
-
-                  <button
-                      type="submit"
-                      className="fade-in"
-                      style={{animationDelay: "0.8s"}}
-                      disabled={isLoading}
-                  >
-                    {isLoading ? "Signing in..." : "Sign in"}
-                  </button>
-
-                  {error && (
-                      <div className="error-message fade-in" style={{animationDelay: "0.7s"}}>
-                        {error}
-                      </div>
-                  )}
-
-                  <div className="signup fade-in" style={{animationDelay: "0.9s"}}>
-                    New to Spoonfeeder? <span onClick={() => setAuthMode("register")}>Create account</span>
-                  </div>
-
-                  <div className="contact-section fade-in" style={{animationDelay: "1s"}}>
-                    <div className="contact-label">Contact us</div>
-                    <div className="contact-icons">
-                      <a
-                          href="https://instagram.com"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="contact-icon"
-                          aria-label="Instagram"
-                      >
-                        <InstagramIcon/>
-                      </a>
-                      <a
-                          href="mailto:support@spoonfeeder.com"
-                          className="contact-icon"
-                          aria-label="Email"
-                      >
-                        <EmailIcon/>
-                      </a>
-                      <a
-                          href="https://wa.me"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="contact-icon"
-                          aria-label="WhatsApp"
-                      >
-                        <WhatsAppIcon/>
-                      </a>
-                    </div>
-                  </div>
-                </motion.form>
-            )}
-
-            {authMode === "forgot" && (
-                <motion.form
-                    key="forgot-form"
-                    className="login-card"
-                    initial={{x: -50, opacity: 0}}
-                    animate={{x: 0, opacity: 1}}
-                    exit={{x: 50, opacity: 0}}
-                    onSubmit={sendResetEmail}
-                    transition={{duration: 0.4, ease: [0.25, 0.1, 0.25, 1]}}
-                    style={{willChange: "transform, opacity"}}
-                >
-                  <h2
-                      className={`email-enter ${fade ? "fade-in" : ""}`}
-                      style={{ animationDelay: "0.3s" }}
-                  >
-                    Enter your email
-                  </h2>
-
-                  <p className={`subtitle ${fade ? "fade-in" : ""}`} style={{animationDelay: "0.4s"}}>
-                    We'll send a secure reset link to your inbox
-                  </p>
-
-                  <input
-                      type="email"
-                      name="email"
-                      placeholder="Email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      onFocus={() => setMode("email")}
-                      onBlur={() => setMode("normal")}
-                      autoComplete="email"
-                      className={fade ? "fade-in" : ""}
-                      style={{animationDelay: "0.5s"}}
-                  />
-
-                  <button
-                      type="submit"
-                      disabled={forgotLoading}
-                      className={fade ? "fade-in" : ""}
-                      style={{animationDelay: "0.6s"}}
-                  >
-                    {forgotLoading ? "Sending..." : "Send Reset Email"}
-                  </button>
-
-                  {error && <div className="error-message">{error}</div>}
-                  {forgotSuccess && (
-                      <div className="success-message">{forgotSuccess}</div>
-                  )}
-
-                  <div className={`signup ${fade ? "fade-in" : ""}`} style={{animationDelay: "0.7s"}}>
-                    Remembered your password?{" "}
-                    <span onClick={() => setAuthMode("login")}>Sign in</span>
-                  </div>
-                  <div className={`contact-section ${fade ? "fade-in" : ""}`} style={{animationDelay: "0.8s"}}>
-                    <div className="contact-label">Contact us</div>
-                    <div className="contact-icons">
-                      <a
-                          href="https://instagram.com"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="contact-icon"
-                          aria-label="Instagram"
-                      >
-                        <InstagramIcon/>
-                      </a>
-                      <a
-                          href="mailto:support@spoonfeeder.com"
-                          className="contact-icon"
-                          aria-label="Email"
-                      >
-                        <EmailIcon/>
-                      </a>
-                      <a
-                          href="https://wa.me"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="contact-icon"
-                          aria-label="WhatsApp"
-                      >
-                        <WhatsAppIcon/>
-                      </a>
-                    </div>
-                  </div>
-                </motion.form>
-            )}
-            {authMode === "register" && (
-                <motion.form
-                    key="register-form"
-                    className="login-card"
-                    onSubmit={handleRegister}
-                    initial={{x: -50, opacity: 0}}
-                    animate={{x: 0, opacity: 1}}
-                    exit={{x: 50, opacity: 0}}
-                    transition={{duration: 0.4, ease: [0.25, 0.1, 0.25, 1]}}
-                    style={{willChange: 'transform, opacity'}}
-                >
-                  <h2 className={fade ? "fade-in" : ""} style={{animationDelay: "0.3s"}}>Create Account</h2>
-                  <p className="subtitle" style={{animationDelay: "0.4s"}}>Sign up to get started with
-                    SpoonFeeder</p>
-
-                  <input
-                      type="email"
-                      name="email"
-                      placeholder="Email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      onFocus={() => setMode("email")}
-                      onBlur={() => setMode("normal")}
-                      className={fade ? "fade-in" : ""}
-                      style={{animationDelay: "0.5s"}}
-                  />
-
-                  <div className="password-wrapper fade-in" style={{animationDelay: "0.6s"}}>
-                    <input
-                        type={showPwd ? "text" : "password"}
-                        name="password"
-                        placeholder="Password"
-                        value={formData.password}
-                        onChange={handleInputChange}
-                        onFocus={() => {
-                          setMode("password");
-                          setPeekDoll(null);
-                        }}
-                        onBlur={() => setMode("normal")}
-                    />
-                    <span
-                        className="show-pwd"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          toggleShowPwd();
-                        }}
-                        onMouseDown={(e) => e.preventDefault()}
-                    >
-                  {showPwd ? "Hide" : "Show"}
-                </span>
-                  </div>
-
-                  <input
-                      type="password"
-                      name="confirmPassword"
-                      placeholder="Confirm Password"
-                      value={formData.confirmPassword}
-                      onChange={handleInputChange}
-                      onFocus={() => {
-                        setMode("password");
-                        setPeekDoll(null);
-                      }}
-                      onBlur={() => setMode("normal")}
-                      className={fade ? "fade-in" : ""}
-                      style={{animationDelay: "0.7s"}}
-                  />
-
-                  <button
-                      type="submit"
-                      className="fade-in"
-                      style={{animationDelay: "0.8s"}}
-                      disabled={isLoading}
-                  >
-                    {isLoading ? "Creating Account..." : "Create Account"}
-                  </button>
-
-                  {error && (
-                      <div className="error-message fade-in" style={{animationDelay: "0.7s"}}>
-                        {error}
-                      </div>
-                  )}
-
-                  <div className="signup fade-in" style={{animationDelay: "0.9s"}}>
-                    Already have an account? <span onClick={() => setAuthMode("login")}>Sign in</span>
-                  </div>
-
-                  <div className="contact-section fade-in" style={{animationDelay: "1s"}}>
-                    <div className="contact-label">Contact us</div>
-                    <div className="contact-icons">
-                      <a
-                          href="https://instagram.com"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="contact-icon"
-                          aria-label="Instagram"
-                      >
-                        <InstagramIcon/>
-                      </a>
-                      <a
-                          href="mailto:support@spoonfeeder.com"
-                          className="contact-icon"
-                          aria-label="Email"
-                      >
-                        <EmailIcon/>
-                      </a>
-                      <a
-                          href="https://wa.me"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="contact-icon"
-                          aria-label="WhatsApp"
-                      >
-                        <WhatsAppIcon/>
-                      </a>
-                    </div>
-                  </div>
-                </motion.form>
-            )}
-          </AnimatePresence>
-        </motion.div>
-      </div>
-  );
 }
 
 export default Login

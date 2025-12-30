@@ -456,24 +456,3 @@
   width: 16px;
   height: 16px;
 }
-
-/* Admin Button */
-.admin-btn {
-  background: transparent;
-  border: 1px solid var(--border-subtle);
-  color: var(--text-secondary);
-  padding: 8px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-left: 8px;
-  transition: all 0.2s ease;
-}
-
-.admin-btn:hover {
-  border-color: var(--primary-accent);
-  color: var(--primary-accent);
-  background: rgba(37, 99, 235, 0.05);
-}
