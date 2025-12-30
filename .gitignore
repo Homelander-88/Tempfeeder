@@ -67,3 +67,5 @@ temp/
 # Database dump files
 *.sql
 *.dump
+
+courses.txt

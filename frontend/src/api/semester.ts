@@ -14,3 +14,7 @@ export const getSemestersByNames = (departmentName: string, collegeName: string)
 // Create a semester
 export const createSemester = (name: string, departmentId: number) =>
   api.post("/semesters", { name, departmentId });
+
+// Delete a semester
+export const deleteSemester = (id: number) =>
+  api.delete(`/semesters/${id}`);

@@ -46,3 +46,26 @@ import pool from "../db/connection";
     res.status(500).json({error:"Internal server error"});
   }
   };
+
+export const deleteCourse = async(req: Request, res: Response) => {
+  try{
+    const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({ error: "Course ID is required" });
+    }
+
+    const result = await pool.query(
+      "DELETE FROM courses WHERE id = $1 RETURNING id, name",
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Course not found" });
+    }
+
+    res.json({ message: "Course deleted successfully", course: result.rows[0] });
+  }catch(error){
+    console.error("Error deleting course");
+    res.status(500).json({error:"Internal server error"});
+  }
+};

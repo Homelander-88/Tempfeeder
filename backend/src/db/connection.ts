@@ -1,5 +1,9 @@
+import { config } from 'dotenv';
 import {Pool} from "pg";
 import { createClient } from '@supabase/supabase-js';
+
+// Load environment variables from .env file
+config();
 
 const pool = new Pool({
     host: process.env.DB_HOST,

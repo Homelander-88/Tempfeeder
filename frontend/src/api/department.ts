@@ -11,3 +11,7 @@ export const getDepartmentsByCollegeName = (collegeName: string) =>
 // Create a department
 export const createDepartment = (name: string, collegeId: number) =>
   api.post("/departments", { name, collegeId });
+
+// Delete a department
+export const deleteDepartment = (id: number) =>
+  api.delete(`/departments/${id}`);

@@ -13,3 +13,7 @@ export const getTopicsByHierarchy = (college: string, department: string, semest
 // Create a new topic
 export const createTopic = (name: string, courseId: number) =>
   api.post("/topics", { name, courseId });
+
+// Delete a topic
+export const deleteTopic = (id: number) =>
+  api.delete(`/topics/${id}`);

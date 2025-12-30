@@ -10,3 +10,7 @@ export const getAllCourses = () => api.get("/courses");
 // Create a new course
 export const createCourse = (name: string, semesterId: number) =>
   api.post("/courses", { name, semesterId });
+
+// Delete a course
+export const deleteCourse = (id: number) =>
+  api.delete(`/courses/${id}`);

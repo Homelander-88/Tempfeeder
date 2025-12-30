@@ -4,6 +4,7 @@ import { getCourses } from '../api/courses';
 import { getTopics } from '../api/topics';
 import { getSemestersByNames } from '../api/semester';
 import { getSubtopics, getSubtopicContent } from '../api/subtopics';
+import { useAuth } from '../context/AuthContext';
 
 export interface HierarchyData {
   college: string;
@@ -49,6 +50,8 @@ interface HierarchyContextType {
   loadTopics: (courseId: string) => Promise<void>;
   loadSubtopics: (topicId: string) => Promise<void>;
   loadContent: (subtopicId: string) => Promise<any>;
+  clearTopicCache: (courseId: string) => void;
+  clearSubtopicCache: (topicId: string) => void;
 }
 
 const HierarchyContext = createContext<HierarchyContextType | undefined>(undefined);
@@ -66,6 +69,7 @@ interface HierarchyProviderProps {
 }
 
 export const HierarchyProvider: React.FC<HierarchyProviderProps> = ({ children }) => {
+  const { isAdmin } = useAuth();
   const [hierarchy, setHierarchy] = useState<HierarchyData | null>(null);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null);
@@ -146,20 +150,23 @@ export const HierarchyProvider: React.FC<HierarchyProviderProps> = ({ children }
   }, [hierarchy]);
 
   const loadTopics = async (courseId: string) => {
-    // Check sessionStorage cache first
-    try {
-      const cacheKey = `topics_cache_${courseId}`;
-      const cached = sessionStorage.getItem(cacheKey);
-      if (cached) {
-        const cachedTopics = JSON.parse(cached);
-        setTopics(cachedTopics);
-        return;
+    // Skip cache for admin users to ensure instant updates
+    if (!isAdmin) {
+      // Check sessionStorage cache first (only for non-admin users)
+      try {
+        const cacheKey = `topics_cache_${courseId}`;
+        const cached = sessionStorage.getItem(cacheKey);
+        if (cached) {
+          const cachedTopics = JSON.parse(cached);
+          setTopics(cachedTopics);
+          return;
+        }
+      } catch (error) {
+        console.error('Error reading topics from cache:', error);
       }
-    } catch (error) {
-      console.error('Error reading topics from cache:', error);
     }
 
-    // If not in cache, fetch from API
+    // If not in cache or admin user, fetch from API
     try {
       const response = await getTopics(parseInt(courseId));
       // Transform API response to include label field for Sidebar compatibility
@@ -168,14 +175,20 @@ export const HierarchyProvider: React.FC<HierarchyProviderProps> = ({ children }
         label: topic.name || topic.label,
         id: topic.id.toString()
       }));
-      // Store in sessionStorage cache
-      try {
-        const cacheKey = `topics_cache_${courseId}`;
-        sessionStorage.setItem(cacheKey, JSON.stringify(transformedTopics));
-      } catch (error) {
-        console.error('Error writing topics to cache:', error);
+
+      // Store in sessionStorage cache only for non-admin users
+      if (!isAdmin) {
+        try {
+          const cacheKey = `topics_cache_${courseId}`;
+          sessionStorage.setItem(cacheKey, JSON.stringify(transformedTopics));
+        } catch (error) {
+          console.error('Error writing topics to cache:', error);
+        }
       }
+
+      console.log('HierarchyContext - Setting topics:', transformedTopics);
       setTopics(transformedTopics);
+      console.log('HierarchyContext - Topics set, current topics state should be:', transformedTopics);
     } catch (error) {
       console.error('Failed to load topics:', error);
       setTopics([]);
@@ -183,20 +196,23 @@ export const HierarchyProvider: React.FC<HierarchyProviderProps> = ({ children }
   };
 
   const loadSubtopics = async (topicId: string) => {
-    // Check sessionStorage cache first
-    try {
-      const cacheKey = `subtopics_cache_${topicId}`;
-      const cached = sessionStorage.getItem(cacheKey);
-      if (cached) {
-        const cachedSubtopics = JSON.parse(cached);
-        setSubtopics(cachedSubtopics);
-        return;
+    // Skip cache for admin users to ensure instant updates
+    if (!isAdmin) {
+      // Check sessionStorage cache first (only for non-admin users)
+      try {
+        const cacheKey = `subtopics_cache_${topicId}`;
+        const cached = sessionStorage.getItem(cacheKey);
+        if (cached) {
+          const cachedSubtopics = JSON.parse(cached);
+          setSubtopics(cachedSubtopics);
+          return;
+        }
+      } catch (error) {
+        console.error('Error reading subtopics from cache:', error);
       }
-    } catch (error) {
-      console.error('Error reading subtopics from cache:', error);
     }
 
-    // If not in cache, fetch from API
+    // If not in cache or admin user, fetch from API
     try {
       // Clear previous subtopics first
       setSubtopics([]);
@@ -208,13 +224,17 @@ export const HierarchyProvider: React.FC<HierarchyProviderProps> = ({ children }
         name: subtopic.name || subtopic.label,
         id: subtopic.id.toString()
       }));
-      // Store in sessionStorage cache
-      try {
-        const cacheKey = `subtopics_cache_${topicId}`;
-        sessionStorage.setItem(cacheKey, JSON.stringify(transformedSubtopics));
-      } catch (error) {
-        console.error('Error writing subtopics to cache:', error);
+
+      // Store in sessionStorage cache only for non-admin users
+      if (!isAdmin) {
+        try {
+          const cacheKey = `subtopics_cache_${topicId}`;
+          sessionStorage.setItem(cacheKey, JSON.stringify(transformedSubtopics));
+        } catch (error) {
+          console.error('Error writing subtopics to cache:', error);
+        }
       }
+
       setSubtopics(transformedSubtopics);
     } catch (error) {
       console.error('Failed to load subtopics:', error);
@@ -228,14 +248,8 @@ export const HierarchyProvider: React.FC<HierarchyProviderProps> = ({ children }
       return response.data;
     } catch (error) {
       console.error('Failed to load content:', error);
-      // Return empty content data
-      return {
-        title: "",
-        videos: [],
-        driveResources: [],
-        notes: "",
-        questions: []
-      };
+      // Return null instead of fallback data
+      return null;
     }
   };
 
@@ -253,6 +267,29 @@ export const HierarchyProvider: React.FC<HierarchyProviderProps> = ({ children }
     }
   }, [hierarchy, loadCourses]);
 
+  // Clear cache for admin users when they modify data
+  const clearTopicCache = (courseId: string) => {
+    if (isAdmin) {
+      try {
+        const cacheKey = `topics_cache_${courseId}`;
+        sessionStorage.removeItem(cacheKey);
+      } catch (error) {
+        console.error('Error clearing topic cache:', error);
+      }
+    }
+  };
+
+  const clearSubtopicCache = (topicId: string) => {
+    if (isAdmin) {
+      try {
+        const cacheKey = `subtopics_cache_${topicId}`;
+        sessionStorage.removeItem(cacheKey);
+      } catch (error) {
+        console.error('Error clearing subtopic cache:', error);
+      }
+    }
+  };
+
   const value: HierarchyContextType = {
     hierarchy,
     selectedCourse,
@@ -269,7 +306,11 @@ export const HierarchyProvider: React.FC<HierarchyProviderProps> = ({ children }
     loadTopics,
     loadSubtopics,
     loadContent,
+    clearTopicCache,
+    clearSubtopicCache,
   };
+
+  console.log('HierarchyContext - Providing value with topics:', topics);
 
   return (
     <HierarchyContext.Provider value={value}>

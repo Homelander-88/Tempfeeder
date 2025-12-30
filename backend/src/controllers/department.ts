@@ -59,3 +59,26 @@ export const addDepartment = async (req: Request, res: Response) => {
     res.status(500).json({error:"Internal server error"});
   }
 };
+
+export const deleteDepartment = async(req: Request, res: Response) => {
+  try{
+    const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({ error: "Department ID is required" });
+    }
+
+    const result = await pool.query(
+      "DELETE FROM departments WHERE id = $1 RETURNING id, name",
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Department not found" });
+    }
+
+    res.json({ message: "Department deleted successfully", department: result.rows[0] });
+  }catch(error){
+    console.error("Error deleting department");
+    res.status(500).json({error:"Internal server error"});
+  }
+};

@@ -65,3 +65,26 @@ export const addSemester = async (req: Request, res: Response) => {
     res.status(500).json({error:"Internal server error"});
   }
 };
+
+export const deleteSemester = async(req: Request, res: Response) => {
+  try{
+    const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({ error: "Semester ID is required" });
+    }
+
+    const result = await pool.query(
+      "DELETE FROM semesters WHERE id = $1 RETURNING id, name",
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Semester not found" });
+    }
+
+    res.json({ message: "Semester deleted successfully", semester: result.rows[0] });
+  }catch(error){
+    console.error("Error deleting semester");
+    res.status(500).json({error:"Internal server error"});
+  }
+};

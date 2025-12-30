@@ -49,3 +49,26 @@ export const addSubtopicContent = async (_req:Request,res:Response)=>{
         res.status(500).json({error:"Internal server error"});
     }
 };
+
+export const deleteSubtopicContent = async(req: Request, res: Response) => {
+  try{
+    const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({ error: "Content ID is required" });
+    }
+
+    const result = await pool.query(
+      "DELETE FROM subtopic_content WHERE id = $1 RETURNING id, title",
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Content not found" });
+    }
+
+    res.json({ message: "Content deleted successfully", content: result.rows[0] });
+  }catch(error){
+    console.error("Error deleting content");
+    res.status(500).json({error:"Internal server error"});
+  }
+};

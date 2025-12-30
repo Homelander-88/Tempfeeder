@@ -3,6 +3,14 @@ import type { ReactNode } from 'react';
 import { login, register } from '../api/auth';
 import type { LoginData, RegisterData, AuthResponse } from '../api/auth';
 
+// Admin emails configuration
+const ADMIN_EMAILS = [
+  'ruhankb29@gmail.com',
+  'prasanthsri542@gmail.com',
+  'sunshine.sankum@gmail.com',
+  'suganthr09@gmail.com'
+];
+
 interface User {
   id: number;
   email: string;
@@ -12,6 +20,7 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   isAuthenticated: boolean;
+  isAdmin: boolean;
   isLoading: boolean;
   login: (data: LoginData) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
@@ -36,6 +45,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Check if current user is admin
+  const isAdmin = user ? ADMIN_EMAILS.includes(user.email) : false;
 
   // Check for existing token on mount
   useEffect(() => {
@@ -99,6 +111,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     user,
     token,
     isAuthenticated: !!token && !!user,
+    isAdmin,
     isLoading,
     login: handleLogin,
     register: handleRegister,
