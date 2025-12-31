@@ -19,11 +19,8 @@ testConnection();
 // CORS configuration
 const corsOptions = {
   origin: [
-    'http://localhost:5173', // Vite dev server
     'http://localhost:3000', // Alternative dev port
-    'http://localhost:8080', // Another common dev port
-    process.env.FRONTEND_URL || 'https://spoonfeeders.vercel.app', // Deployed frontend
-    'https://spoonfeeder-three.vercel.app' // Alternative Vercel URL
+    process.env.FRONTEND_URL || 'https://spoonfeeders.vercel.app', // Alternative Vercel URL
   ],
   credentials: true,
   optionsSuccessStatus: 200

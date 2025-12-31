@@ -95,7 +95,8 @@ const ContentView: React.FC<ContentViewProps> = ({
   const [contentAddFormData, setContentAddFormData] = useState({
     contentType: 'notes',
     title: '',
-    content: ''
+    content: '',
+    resourceType: 'ppt' // 'pdf' or 'ppt'
   });
   const [adminFormData, setAdminFormData] = useState({
     name: '',
@@ -531,15 +532,15 @@ const ContentView: React.FC<ContentViewProps> = ({
         // Debug: Log the event
         console.log('Shift+X pressed, openResources:', openResources.size);
 
-        event.preventDefault();
+          event.preventDefault();
         // Close all open resources regardless of focus
-        setOpenResources(new Set());
+          setOpenResources(new Set());
         setLoadingResources(new Set()); // Clear loading states
 
         // Remove focus from any iframe
         const activeElement = document.activeElement;
-        if (activeElement && activeElement instanceof HTMLElement) {
-          activeElement.blur();
+          if (activeElement && activeElement instanceof HTMLElement) {
+            activeElement.blur();
         }
       }
     };
@@ -663,11 +664,44 @@ const ContentView: React.FC<ContentViewProps> = ({
   };
 
   // Parse and render structured text with visual elements for hierarchy
-  const parseStructuredText = (text: string) => {
+  const parseStructuredText = (text: string, enableCodeDetection: boolean = false) => {
     if (!text || text.trim() === '') {
       return [<p key="empty" className="structured-paragraph">No content available</p>];
     }
 
+
+    // If code detection is enabled, check if entire text should be treated as code
+    if (enableCodeDetection) {
+      const hasCodeContent = text.split('\n').some(line => {
+        const trimmed = line.trim();
+        // Function definitions
+        if (trimmed.match(/^(function|def|class|public|private|void|int|string|bool|const|let|var)\s+\w+/)) return true;
+        // Algorithm/pseudocode patterns
+        if (trimmed.match(/^(if|for|while|do|BEGIN|END|READ|FOR|WHILE|IF|ELSE|RETURN)\s|\w+\([^)]*\)\s*[:{]|\w+\s*\([^)]*\)\s*{/)) return true;
+        // Array access patterns
+        if (trimmed.match(/[A-Z]\[[^\]]+\]/)) return true;
+        // Assignment with code-like syntax
+        if (trimmed.match(/^\w+\s*=\s*[^=]/) && (trimmed.includes('[') || trimmed.includes('(') || trimmed.includes('{'))) return true;
+        return false;
+      });
+
+      // If text contains code patterns, render entire text as one code block
+      if (hasCodeContent) {
+        return [
+          <pre
+            key="full-code-block"
+            className="structured-code-block"
+            data-language="text"
+          >
+            <code className="language-text">
+              {text}
+            </code>
+          </pre>
+        ];
+      }
+    }
+
+    // Content parsing for regular text sections
     const lines = text.split('\n');
     const elements: JSX.Element[] = [];
     let inList = false;
@@ -675,9 +709,6 @@ const ContentView: React.FC<ContentViewProps> = ({
     let currentIndentation = 0;
     let listType: 'bullet' | 'numbered' = 'bullet';
     let listStartNumber = 1;
-    let inCodeBlock = false;
-    let codeBlockLines: string[] = [];
-    let codeBlockLanguage = '';
     let inTable = false;
     let tableRows: string[][] = [];
     let tableHeaders: string[] = [];
@@ -741,40 +772,20 @@ const ContentView: React.FC<ContentViewProps> = ({
       const trimmedLine = line.trim();
       const leadingSpaces = line.length - line.trimLeft().length;
 
-      // Code block handling (triple backticks)
-      const codeBlockStart = trimmedLine.match(/^```(\w+)?$/);
-      if (codeBlockStart) {
-        flushList();
-        flushTable();
-        if (inCodeBlock) {
-          // End of code block
-          elements.push(
-            <pre
-              key={`code-${index}`}
-              className="structured-code-block"
-              data-language={codeBlockLanguage || 'text'}
-            >
-              <code className={`language-${codeBlockLanguage || 'text'}`}>
-                {codeBlockLines.join('\n')}
-              </code>
-            </pre>
-          );
-          inCodeBlock = false;
-          codeBlockLines = [];
-          codeBlockLanguage = '';
-        } else {
-          // Start of code block
-          inCodeBlock = true;
-          codeBlockLanguage = codeBlockStart[1] || '';
-        }
-        return;
-      }
+      // Auto-detect code patterns (functions, algorithms, code-like syntax)
+      const isCodePattern = (line: string) => {
+        const trimmed = line.trim();
+        // Function definitions
+        if (trimmed.match(/^(function|def|class|public|private|void|int|string|bool|const|let|var)\s+\w+/)) return true;
+        // Algorithm/pseudocode patterns
+        if (trimmed.match(/^(if|for|while|do|BEGIN|END|READ|FOR|WHILE|IF|ELSE|RETURN)\s|\w+\([^)]*\)\s*[:{]|\w+\s*\([^)]*\)\s*{/)) return true;
+        // Array access patterns
+        if (trimmed.match(/[A-Z]\[[^\]]+\]/)) return true;
+        // Assignment with code-like syntax
+        if (trimmed.match(/^\w+\s*=\s*[^=]/) && (trimmed.includes('[') || trimmed.includes('(') || trimmed.includes('{'))) return true;
+        return false;
+      };
 
-      // If inside code block, collect lines
-      if (inCodeBlock) {
-        codeBlockLines.push(line); // Preserve original line including indentation
-        return;
-      }
 
       // Table detection - Markdown format
       const tableRow = trimmedLine.match(/^\|(.+)\|$/);
@@ -844,10 +855,12 @@ const ContentView: React.FC<ContentViewProps> = ({
           // Extend existing code block
           const lastElement = elements[elements.length - 1];
           const existingCode = lastElement.props.children.props.children;
+          const combinedCode = existingCode + '\n' + line;
+
           elements[elements.length - 1] = (
             <pre key={`code-extended-${index}`} className="structured-code-block">
               <code className="language-text">
-                {existingCode + '\n' + line}
+                {combinedCode}
               </code>
             </pre>
           );
@@ -965,21 +978,6 @@ const ContentView: React.FC<ContentViewProps> = ({
     flushList();
     flushTable();
 
-    // Handle unclosed code block
-    if (inCodeBlock && codeBlockLines.length > 0) {
-      elements.push(
-        <pre
-          key="code-unclosed"
-          className="structured-code-block"
-          data-language={codeBlockLanguage || 'text'}
-        >
-          <code className={`language-${codeBlockLanguage || 'text'}`}>
-            {codeBlockLines.join('\n')}
-          </code>
-        </pre>
-      );
-    }
-
     // Ensure we always return at least one element
     if (elements.length === 0) {
       return [<p key="empty" className="structured-paragraph">Content could not be parsed</p>];
@@ -988,38 +986,60 @@ const ContentView: React.FC<ContentViewProps> = ({
     return elements;
   };
 
-  // Parse inline formatting like **bold** and *italic*
-  const parseInlineFormatting = (text: string) => {
+  // Parse inline formatting like **bold** and *italic* with robust code preservation
+  const parseInlineFormatting = (text: string, preserveCode: boolean = false) => {
     if (!text) return text;
 
     let formattedText = text;
 
-    // Escape HTML entities first to prevent XSS
-    formattedText = formattedText
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
+    // For code preservation, skip HTML escaping to maintain exact code structure
+    if (!preserveCode) {
+      // Escape HTML entities first to prevent XSS (but preserve code)
+      formattedText = formattedText
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
 
-    // Links [text](url)
-    formattedText = formattedText.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="structured-link" target="_blank" rel="noopener noreferrer">$1</a>');
+    // Links [text](url) - only process if not preserving code
+    if (!preserveCode) {
+      formattedText = formattedText.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="structured-link" target="_blank" rel="noopener noreferrer">$1</a>');
+    }
 
-    // Strikethrough (~~text~~)
-    formattedText = formattedText.replace(/~~(.*?)~~/g, '<span class="structured-strikethrough">$1</span>');
+    // Strikethrough (~~text~~) - only process if not preserving code
+    if (!preserveCode) {
+      formattedText = formattedText.replace(/~~(.*?)~~/g, '<span class="structured-strikethrough">$1</span>');
+    }
 
-    // Bold text (**text**) - handle multiline and nested
-    formattedText = formattedText.replace(/\*\*(.*?)\*\*/g, '<span class="structured-bold">$1</span>');
+    // Bold text (**text**) - handle multiline and nested, but skip in code
+    if (!preserveCode) {
+      formattedText = formattedText.replace(/\*\*(.*?)\*\*/g, '<span class="structured-bold">$1</span>');
+    }
 
-    // Italic text (*text* or _text_) - but avoid matching **bold** patterns
-    formattedText = formattedText.replace(/(?<!\*)\*(?!\*)([^*]+?)(?<!\*)\*(?!\*)/g, '<span class="structured-italic">$1</span>');
-    formattedText = formattedText.replace(/(?<!_)_([^_]+?)_(?!_)/g, '<span class="structured-italic">$1</span>');
+    // Italic text (*text* or _text_) - but avoid matching **bold** patterns, skip in code
+    if (!preserveCode) {
+      formattedText = formattedText.replace(/(?<!\*)\*(?!\*)([^*]+?)(?<!\*)\*(?!\*)/g, '<span class="structured-italic">$1</span>');
+      formattedText = formattedText.replace(/(?<!_)_([^_]+?)_(?!_)/g, '<span class="structured-italic">$1</span>');
+    }
 
-    // Inline code (`code`) - handle escaped backticks and multiple lines
-    formattedText = formattedText.replace(/`([^`\n]+)`/g, '<code class="structured-inline-code">$1</code>');
+    // Inline code (`code`) - preserve code exactly
+    formattedText = formattedText.replace(/`([^`\n]+)`/g, (match, code) => {
+      // For inline code, we need to escape HTML but preserve the code structure
+      const escapedCode = code
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+      return `<code class="structured-inline-code">${escapedCode}</code>`;
+    });
 
-    // Handle line breaks within paragraphs
-    formattedText = formattedText.replace(/\n/g, '<br>');
+    // Handle line breaks within paragraphs - only if not preserving code
+    if (!preserveCode) {
+      formattedText = formattedText.replace(/\n/g, '<br>');
+    }
 
     // Return as dangerouslySetInnerHTML to render HTML
     return <span dangerouslySetInnerHTML={{ __html: formattedText }} />;
@@ -1114,7 +1134,7 @@ const ContentView: React.FC<ContentViewProps> = ({
         return (
           <section className="section" key="featuredVideo">
             <div className="section-header">
-              <h2 className="section-title">Video Content</h2>
+            <h2 className="section-title">Video Content</h2>
               {isAdmin && hasVideos && (
                 <button
                   className="section-delete-btn"
@@ -1168,8 +1188,8 @@ const ContentView: React.FC<ContentViewProps> = ({
                           </svg>
                         </button>
                       )}
-                      <div className="video-card compact centered-content">
-                        <div className="video-wrapper small">
+            <div className="video-card compact centered-content">
+              <div className="video-wrapper small">
                           {loadingVideos.has(videoId) && (
                             <div className="video-loading">
                               <div className="video-loading-spinner"></div>
@@ -1177,10 +1197,10 @@ const ContentView: React.FC<ContentViewProps> = ({
                             </div>
                           )}
                           {playingVideos[videoId] ? (
-                            <iframe
+                  <iframe
                               src={`https://www.youtube.com/embed/${getYoutubeId(video.youtubeUrl)}?autoplay=1&rel=0&modestbranding=1&showinfo=0`}
-                              allow="autoplay; encrypted-media"
-                              allowFullScreen
+                    allow="autoplay; encrypted-media"
+                    allowFullScreen
                               onLoad={() => {
                                 setLoadingVideos(prev => {
                                   const newSet = new Set(prev);
@@ -1192,10 +1212,10 @@ const ContentView: React.FC<ContentViewProps> = ({
                                 opacity: loadingVideos.has(videoId) ? 0 : 1,
                                 transition: 'opacity 0.3s ease-in-out'
                               }}
-                            />
-                          ) : (
-                            <div
-                              className="video-placeholder"
+                  />
+                ) : (
+                  <div
+                    className="video-placeholder"
                               onClick={() => handlePlayVideo(videoId)}
                             >
                               <img
@@ -1235,21 +1255,21 @@ const ContentView: React.FC<ContentViewProps> = ({
                                     img.style.display = 'none';
                                   }
                                 }}
-                                style={{
+                    style={{
                                   width: '100%',
                                   height: '100%',
                                   objectFit: 'cover',
                                   borderRadius: '8px'
                                 }}
                               />
-                              <div className="play-icon">▶</div>
+                    <div className="play-icon">▶</div>
                               {video.title && (
                                 <div className="video-title-overlay">{video.title}</div>
                               )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
+                  </div>
+                )}
+              </div>
+            </div>
                     </div>
                   );
                 })}
@@ -1365,8 +1385,9 @@ const ContentView: React.FC<ContentViewProps> = ({
             <div className="drive-resources-container">
               {contentData.driveResources.map((res: any, index: number) => {
                 const isOpen = openResources.has(res.id);
-                const isPdf = res.url.toLowerCase().includes('.pdf');
-                const isPpt = res.url.toLowerCase().includes('.ppt') || res.url.toLowerCase().includes('.pptx');
+                const resourceType = res.metadata?.resourceType || 'ppt'; // Default to ppt for backward compatibility
+                const isPdf = resourceType === 'pdf';
+                const isPpt = resourceType === 'ppt';
 
                 return (
                   <div className="resource-item" key={index}>
@@ -1469,21 +1490,41 @@ const ContentView: React.FC<ContentViewProps> = ({
                               <span className="resource-loading-text">Loading resource...</span>
                             </div>
                           )}
+                          {isPdf ? (
+                            // Use Google Docs PDF viewer for PDFs
+                            <iframe
+                              className="resource-frame"
+                              src={`https://docs.google.com/viewer?url=${encodeURIComponent(res.url)}&embedded=true`}
+                              allow="autoplay"
+                              title={res.title}
+                              onLoad={() => setLoadingResources(prev => {
+                                const newSet = new Set(prev);
+                                newSet.delete(res.id);
+                                return newSet;
+                              })}
+                              style={{
+                                opacity: loadingResources.has(res.id) ? 0 : 1,
+                                transition: 'opacity 0.3s ease-in-out'
+                              }}
+                            />
+                          ) : (
+                            // Use direct iframe for PPTs (which work fine)
                           <iframe
                             className="resource-frame"
                             src={res.url}
                             allow="autoplay"
                             title={res.title}
-                            onLoad={() => setLoadingResources(prev => {
-                              const newSet = new Set(prev);
-                              newSet.delete(res.id);
-                              return newSet;
-                            })}
-                            style={{
-                              opacity: loadingResources.has(res.id) ? 0 : 1,
-                              transition: 'opacity 0.3s ease-in-out'
-                            }}
-                          />
+                              onLoad={() => setLoadingResources(prev => {
+                                const newSet = new Set(prev);
+                                newSet.delete(res.id);
+                                return newSet;
+                              })}
+                              style={{
+                                opacity: loadingResources.has(res.id) ? 0 : 1,
+                                transition: 'opacity 0.3s ease-in-out'
+                              }}
+                            />
+                          )}
                         </div>
                       </>
                     )}
@@ -1517,9 +1558,21 @@ const ContentView: React.FC<ContentViewProps> = ({
                           onChange={(e) => setContentAddFormData({...contentAddFormData, title: e.target.value})}
                           className="content-form-input"
                         />
+                      </div>
+                      <div className="add-form-row">
+                        <select
+                          value={contentAddFormData.resourceType}
+                          onChange={(e) => setContentAddFormData({...contentAddFormData, resourceType: e.target.value})}
+                          className="content-form-select"
+                        >
+                          <option value="ppt">PowerPoint Presentation (PPT)</option>
+                          <option value="pdf">PDF Document</option>
+                        </select>
+                      </div>
+                      <div className="add-form-row">
                         <input
                           type="url"
-                          placeholder="Resource URL"
+                          placeholder="Resource URL (Google Drive link)"
                           value={contentAddFormData.content}
                           onChange={(e) => setContentAddFormData({...contentAddFormData, content: e.target.value})}
                           className="content-form-input"
@@ -1535,7 +1588,8 @@ const ContentView: React.FC<ContentViewProps> = ({
                                   contentType: 'drive',
                                   contentOrder: 1,
                                   title: contentAddFormData.title,
-                                  content: contentAddFormData.content
+                                  content: contentAddFormData.content,
+                                  metadata: { resourceType: contentAddFormData.resourceType }
                                 });
                                 // Refresh content
                                 loadContentData();
@@ -1781,7 +1835,7 @@ const ContentView: React.FC<ContentViewProps> = ({
                       </summary>
                       <div className="qa-widget-answer">
                         <div className="answer-content">
-                          {parseStructuredText(q.answer)}
+                          {parseStructuredText(q.answer, true)}
                         </div>
                       </div>
                     </details>
@@ -1874,6 +1928,9 @@ const ContentView: React.FC<ContentViewProps> = ({
     const currentIndex = resources.findIndex((res: any) => res.id === fullscreenResource);
     const resource = resources[currentIndex];
     const hasMultipleResources = resources.length > 1;
+    const resourceType = resource?.metadata?.resourceType || 'ppt';
+    const isPdf = resourceType === 'pdf';
+    const isPpt = resourceType === 'ppt';
 
     const navigateToResource = (direction: 'prev' | 'next') => {
       if (!hasMultipleResources) return;
@@ -1894,24 +1951,24 @@ const ContentView: React.FC<ContentViewProps> = ({
           <div className="resource-fullscreen-header">
             {hasMultipleResources && (
               <div className="resource-nav-buttons">
-                <button
-                  className="resource-nav-btn resource-nav-prev"
-                  onClick={() => navigateToResource('prev')}
-                  title="Previous Resource"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M15 18l-6-6 6-6"/>
-                  </svg>
-                </button>
-                <button
-                  className="resource-nav-btn resource-nav-next"
-                  onClick={() => navigateToResource('next')}
-                  title="Next Resource"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M9 18l6-6-6-6"/>
-                  </svg>
-                </button>
+              <button
+                className="resource-nav-btn resource-nav-prev"
+                onClick={() => navigateToResource('prev')}
+                title="Previous Resource"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M15 18l-6-6 6-6"/>
+                </svg>
+              </button>
+              <button
+                className="resource-nav-btn resource-nav-next"
+                onClick={() => navigateToResource('next')}
+                title="Next Resource"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 18l6-6-6-6"/>
+                </svg>
+              </button>
               </div>
             )}
             <div className="resource-fullscreen-title">
@@ -1939,21 +1996,39 @@ const ContentView: React.FC<ContentViewProps> = ({
                 <span className="resource-loading-text">Loading resource...</span>
               </div>
             )}
+            {isPdf ? (
+              <iframe
+                className="resource-fullscreen-iframe"
+                src={`https://docs.google.com/viewer?url=${encodeURIComponent(resource.url)}&embedded=true`}
+                allow="autoplay"
+                title={resource.title}
+                onLoad={() => setLoadingResources(prev => {
+                  const newSet = new Set(prev);
+                  newSet.delete(resource.id);
+                  return newSet;
+                })}
+                style={{
+                  opacity: loadingResources.has(resource.id) ? 0 : 1,
+                  transition: 'opacity 0.3s ease-in-out'
+                }}
+              />
+            ) : (
             <iframe
               className="resource-fullscreen-iframe"
               src={resource.url}
               allow="autoplay"
               title={resource.title}
-              onLoad={() => setLoadingResources(prev => {
-                const newSet = new Set(prev);
-                newSet.delete(resource.id);
-                return newSet;
-              })}
-              style={{
-                opacity: loadingResources.has(resource.id) ? 0 : 1,
-                transition: 'opacity 0.3s ease-in-out'
-              }}
-            />
+                onLoad={() => setLoadingResources(prev => {
+                  const newSet = new Set(prev);
+                  newSet.delete(resource.id);
+                  return newSet;
+                })}
+                style={{
+                  opacity: loadingResources.has(resource.id) ? 0 : 1,
+                  transition: 'opacity 0.3s ease-in-out'
+                }}
+              />
+            )}
           </div>
         </div>
       );

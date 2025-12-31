@@ -864,14 +864,15 @@ body {
 }
 
 .structured-inline-code {
-  background: rgba(0, 0, 0, 0.15);
-  color: var(--text-primary);
+  background: #f6f8fa;
+  color: #24292f;
   padding: 2px 6px;
   border-radius: 4px;
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  font-size: 0.9em;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.85em;
   font-weight: 500;
-  border: 1px solid var(--border-subtle);
+  border: 1px solid #d1d5db;
+  white-space: pre; /* Preserve exact spacing */
 }
 
 .structured-horizontal-line {
@@ -964,21 +965,23 @@ body {
 }
 
 .structured-code-block {
-  background: var(--background-dark);
-  border: 1px solid var(--border-subtle);
-  border-radius: 12px;
-  padding: 20px;
+  background: #1e1e1e;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 16px;
   margin: 1.5rem 0;
   overflow-x: auto;
+  overflow-y: visible; /* Ensure content is visible */
   font-family: 'JetBrains Mono', 'Fira Code', 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
-  font-size: 0.85rem;
-  line-height: 1.6;
-  white-space: pre-wrap; /* Preserve indentation and line breaks */
-  word-wrap: break-word;
-  tab-size: 4;
-  color: #e6e6e6;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  white-space: pre; /* Preserve exact formatting */
+  tab-size: 2;
+  color: #d4d4d4;
   position: relative;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  word-break: normal; /* Prevent breaking within words */
+  word-wrap: normal; /* Don't wrap long lines */
 }
 
 .structured-code-block::before {
@@ -1003,8 +1006,9 @@ body {
   font-family: inherit;
   font-size: inherit;
   color: inherit;
-  white-space: pre-wrap; /* Preserve all whitespace including indentation */
+  white-space: pre; /* Preserve exact formatting */
   display: block;
+  line-height: inherit;
 }
 
 /* Language-specific syntax highlighting colors */
@@ -1831,6 +1835,21 @@ body {
 .content-form-textarea {
   resize: vertical;
   min-height: 100px;
+}
+
+.content-form-select {
+  padding: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: var(--background-dark);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.content-form-select:focus {
+  outline: none;
+  border-color: var(--primary-accent);
 }
 
 
