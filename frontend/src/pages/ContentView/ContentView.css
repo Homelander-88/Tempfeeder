@@ -519,8 +519,6 @@ body {
   cursor: pointer;
   background: var(--card-background);
   border-radius: 12px;
-  background-size: cover;
-  background-position: center;
 }
 
 .centered-content {
@@ -547,6 +545,11 @@ body {
   color: white;
   text-shadow: 0 0 10px rgba(0, 0, 0, 0.7);
   pointer-events: none;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
 }
 
 /* ===== Notes ===== */
@@ -1322,6 +1325,37 @@ body {
 .resource-loading-text {
   color: var(--text-secondary);
   font-size: 0.9rem;
+  font-weight: 500;
+}
+
+/* ===== Video Loading ===== */
+.video-loading {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--background-dark);
+  z-index: 5;
+  gap: 12px;
+}
+
+.video-loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid rgba(37, 99, 235, 0.1);
+  border-top-color: #2563EB;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.video-loading-text {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
   font-weight: 500;
 }
 

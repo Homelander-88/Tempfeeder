@@ -23,7 +23,7 @@ export default function SettingsDropdown({ onSave }: SettingsDropdownProps) {
     const [loadingSemesters, setLoadingSemesters] = useState(false);
     const containerRef = useRef<HTMLDivElement | null>(null);
     const collegeRef = useRef<HTMLSelectElement | null>(null);
-    const { setHierarchy,loadCourses } = useHierarchy();
+    const { setHierarchy, setSelectedCourse, setSelectedTopic, setSelectedSubtopic} = useHierarchy();
 
     // Fetch colleges
     useEffect(() => {
@@ -132,30 +132,31 @@ export default function SettingsDropdown({ onSave }: SettingsDropdownProps) {
                        selectedDepartment !== '_placeholder' &&
                        selectedSemester !== '_placeholder';
 
-    const handleApply = () => {
+    const handleApply = async () => {
         if (!isFormValid) return;
 
         // Find the actual names from the data arrays
         const collegeObj = collegesData.find(c => c.id === Number(selectedCollege));
         const collegeName = collegeObj ? collegeObj.name : selectedCollege;
 
-        console.log('Saving hierarchy:', {
-            college: collegeName,
-            department: selectedDepartment,
-            semester: selectedSemester
-        });
-
-        setHierarchy({
+        const newHierarchy = {
             college: collegeName, // Store the name, not the ID
             department: selectedDepartment, // Already a name
             semester: selectedSemester // Already a name
-        });
+        };
 
-        // Trigger courses to reload with the new hierarchy
-        setTimeout(() => {
-            loadCourses().catch(err => console.error('Failed to load courses:', err));
-        }, 100);
+        console.log('Saving hierarchy:', newHierarchy);
 
+        // Clear current navigation state immediately to prevent flickering
+        // This will clear the sidebar and prevent showing stale data
+        setSelectedCourse(null);
+        setSelectedTopic(null);
+        setSelectedSubtopic(null);
+
+        // Set hierarchy - this will update localStorage and trigger course reload
+        setHierarchy(newHierarchy);
+
+        // Close the settings dropdown immediately
         setOpen(false);
 
         // Notify parent to close profile dropdown

@@ -68,6 +68,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setIsLoading(false);
   }, []);
 
+  // Listen for storage changes (token removal from API interceptor)
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'token' && !e.newValue) {
+        // Token was removed - clear auth state
+        setToken(null);
+        setUser(null);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
   const handleLogin = async (data: LoginData): Promise<boolean> => {
     try {
       const response: AuthResponse = await login(data);

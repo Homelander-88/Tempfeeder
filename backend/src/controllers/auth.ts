@@ -26,7 +26,7 @@ export const register = async (_req: Request, res: Response) => {
         const jwtsecret = process.env.JWT_SECRET;
         if (!jwtsecret) return res.status(500).json({ error: "Server configuration error" });
 
-        const token = jwt.sign({ userId: newUser.id, email: newUser.email }, jwtsecret, { expiresIn: "3h" });
+        const token = jwt.sign({ userId: newUser.id, email: newUser.email }, jwtsecret, { expiresIn: "5h" });
         return res.status(201).json({ message: "User registered", user: { id: newUser.id, email: newUser.email }, token });
     } catch (err) {
         console.error("register error:", err);
@@ -49,7 +49,7 @@ export const login = async (req: Request, res: Response) => {
         const jwtsecret = process.env.JWT_SECRET;
         if (!jwtsecret) return res.status(500).json({ error: "Server configuration error" });
 
-        const token = jwt.sign({ userId: existingUser.id, email: existingUser.email }, jwtsecret, { expiresIn: "3h" });
+        const token = jwt.sign({ userId: existingUser.id, email: existingUser.email }, jwtsecret, { expiresIn: "5h" });
         return res.json({ message: "Login successful", user: { id: existingUser.id, email: existingUser.email }, token });
     } catch (err) {
         console.error("Login error:", err);
@@ -88,7 +88,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
             },
         });
 
-        const resetUrl = `${process.env.FRONTEND_URL || ""}/reset-password?token=${token}`;
+        const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${token}`;
 
         await transporter.sendMail({
             from: process.env.EMAIL_FROM || "no-reply@example.com",
@@ -131,7 +131,7 @@ export const resetPassword = async (req: Request, res: Response) => {
         const jwtsecret = process.env.JWT_SECRET;
         if (!jwtsecret) return res.status(500).json({ error: "Server JWT config missing" });
 
-        const newToken = jwt.sign({ userId: user.id, email: user.email }, jwtsecret, { expiresIn: "3h" });
+        const newToken = jwt.sign({ userId: user.id, email: user.email }, jwtsecret, { expiresIn: "5h" });
         return res.json({ message: "Password reset successful", token: newToken });
     } catch (err) {
         console.error("resetPassword error:", err);

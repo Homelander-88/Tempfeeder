@@ -61,7 +61,9 @@ interface LoginProps {
   initialMode?: "login" | "register";
 }
 
-const API_BASE = (import.meta.env.VITE_API_BASE as string) || "https://spoonfeeder.onrender.com/api";
+// Use the same API base as the rest of the app
+import api from '../../api/api';
+const API_BASE = api.defaults.baseURL;
 
 const isValidEmail = (value: string) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
@@ -384,7 +386,14 @@ function Login({onNavigateToContent, onNavigateToCollegeDepartment, initialMode 
                       style={{animationDelay: "0.8s"}}
                       disabled={isLoading}
                   >
-                    {isLoading ? "Signing in..." : "Sign in"}
+                    {isLoading ? (
+                      <>
+                        <div className="auth-spinner"></div>
+                        Signing in...
+                      </>
+                    ) : (
+                      "Sign in"
+                    )}
                   </button>
 
                   <div className="signup fade-in" style={{animationDelay: "0.9s"}}>
@@ -448,7 +457,14 @@ function Login({onNavigateToContent, onNavigateToCollegeDepartment, initialMode 
                       className={fade ? "fade-in" : ""}
                       style={{animationDelay: "0.6s"}}
                   >
-                    {forgotLoading ? "Sending..." : "Send Reset Email"}
+                    {forgotLoading ? (
+                      <>
+                        <div className="auth-spinner"></div>
+                        Sending...
+                      </>
+                    ) : (
+                      "Send Reset Email"
+                    )}
                   </button>
 
                   {error && <div className="error-message">{error}</div>}
@@ -557,7 +573,14 @@ function Login({onNavigateToContent, onNavigateToCollegeDepartment, initialMode 
                       style={{animationDelay: "0.8s"}}
                       disabled={isLoading}
                   >
-                    {isLoading ? "Creating Account..." : "Create Account"}
+                    {isLoading ? (
+                      <>
+                        <div className="auth-spinner"></div>
+                        Creating Account...
+                      </>
+                    ) : (
+                      "Create Account"
+                    )}
                   </button>
 
                   <div className="signup fade-in" style={{animationDelay: "0.9s"}}>

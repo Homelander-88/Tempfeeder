@@ -664,3 +664,20 @@ input[type="password"]::-webkit-clear-button {
   font-size: 0.95rem;
   margin-top: 8px
 }
+
+/* ===== Auth Spinner ===== */
+.auth-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-right: 8px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}

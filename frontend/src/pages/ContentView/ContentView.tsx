@@ -28,6 +28,7 @@ const ContentView: React.FC<ContentViewProps> = ({
 }) => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [playingVideos, setPlayingVideos] = useState<{ [key: string]: boolean }>({});
+  const [loadingVideos, setLoadingVideos] = useState<Set<string>>(new Set());
   const [openResources, setOpenResources] = useState<Set<number>>(new Set());
   const [fullscreenResource, setFullscreenResource] = useState<number | null>(null);
   const [loadingResources, setLoadingResources] = useState<Set<number>>(new Set());
@@ -641,7 +642,25 @@ const ContentView: React.FC<ContentViewProps> = ({
     return match ? match[1] : "";
   };
 
-  const handlePlayVideo = (id: string) => setPlayingVideos({ ...playingVideos, [id]: true });
+  const getYoutubeThumbnail = (url: string, qualityIndex: number = 0) => {
+    const videoId = getYoutubeId(url);
+    if (!videoId) return "";
+
+    // Try thumbnail qualities from highest to lowest resolution
+    const thumbnailQualities = ['maxresdefault', 'sddefault', 'hqdefault', 'mqdefault', 'default'];
+    const baseUrl = `https://img.youtube.com/vi/${videoId}`;
+
+    if (qualityIndex >= thumbnailQualities.length) {
+      return ""; // No more qualities to try, return empty for blank thumbnail
+    }
+
+    return `${baseUrl}/${thumbnailQualities[qualityIndex]}.jpg`;
+  };
+
+  const handlePlayVideo = (id: string) => {
+    setPlayingVideos({ ...playingVideos, [id]: true });
+    setLoadingVideos(prev => new Set(prev).add(id));
+  };
 
   // Parse and render structured text with visual elements for hierarchy
   const parseStructuredText = (text: string) => {
@@ -1151,22 +1170,78 @@ const ContentView: React.FC<ContentViewProps> = ({
                       )}
                       <div className="video-card compact centered-content">
                         <div className="video-wrapper small">
+                          {loadingVideos.has(videoId) && (
+                            <div className="video-loading">
+                              <div className="video-loading-spinner"></div>
+                              <span className="video-loading-text">Loading video...</span>
+                            </div>
+                          )}
                           {playingVideos[videoId] ? (
                             <iframe
                               src={`https://www.youtube.com/embed/${getYoutubeId(video.youtubeUrl)}?autoplay=1&rel=0&modestbranding=1&showinfo=0`}
                               allow="autoplay; encrypted-media"
                               allowFullScreen
+                              onLoad={() => {
+                                setLoadingVideos(prev => {
+                                  const newSet = new Set(prev);
+                                  newSet.delete(videoId);
+                                  return newSet;
+                                });
+                              }}
+                              style={{
+                                opacity: loadingVideos.has(videoId) ? 0 : 1,
+                                transition: 'opacity 0.3s ease-in-out'
+                              }}
                             />
                           ) : (
                             <div
                               className="video-placeholder"
                               onClick={() => handlePlayVideo(videoId)}
-                              style={{
-                                backgroundImage: `url(https://img.youtube.com/vi/${getYoutubeId(video.youtubeUrl)}/maxresdefault.jpg)`,
-                                backgroundSize: 'cover',
-                                backgroundPosition: 'center'
-                              }}
                             >
+                              <img
+                                src={getYoutubeThumbnail(video.youtubeUrl)}
+                                alt={video.title || "Video thumbnail"}
+                                onError={(e) => {
+                                  const img = e.target as HTMLImageElement;
+                                  const currentSrc = img.src;
+                                  const videoId = getYoutubeId(video.youtubeUrl);
+
+                                  if (!videoId) {
+                                    // Hide image if no video ID
+                                    img.style.display = 'none';
+                                    return;
+                                  }
+
+                                  const baseUrl = `https://img.youtube.com/vi/${videoId}`;
+
+                                  // If maxresdefault failed, try sddefault once
+                                  if (currentSrc.includes('maxresdefault')) {
+                                    img.src = `${baseUrl}/sddefault.jpg`;
+                                  } else {
+                                    // sddefault also failed - hide the image completely
+                                    img.style.display = 'none';
+                                  }
+                                }}
+                                onLoad={(e) => {
+                                  const img = e.target as HTMLImageElement;
+                                  const videoId = getYoutubeId(video.youtubeUrl);
+
+                                  if (!videoId) return;
+
+                                  // Check if this might be YouTube's default thumbnail (very small dimensions)
+                                  // YouTube's default thumbnail is usually 120x90
+                                  if (img.naturalWidth <= 130 && img.naturalHeight <= 100) {
+                                    // This is likely YouTube's default placeholder - hide it
+                                    img.style.display = 'none';
+                                  }
+                                }}
+                                style={{
+                                  width: '100%',
+                                  height: '100%',
+                                  objectFit: 'cover',
+                                  borderRadius: '8px'
+                                }}
+                              />
                               <div className="play-icon">▶</div>
                               {video.title && (
                                 <div className="video-title-overlay">{video.title}</div>

@@ -253,10 +253,13 @@ export const HierarchyProvider: React.FC<HierarchyProviderProps> = ({ children }
     }
   };
 
-  const handleSetHierarchy = (newHierarchy: HierarchyData) => {
-    setHierarchy(newHierarchy);
+  const handleSetHierarchy = useCallback((newHierarchy: HierarchyData) => {
+    console.log('Setting hierarchy to localStorage and state:', newHierarchy);
+    // Update localStorage immediately
     localStorage.setItem('hierarchy', JSON.stringify(newHierarchy));
-  };
+    // Update state
+    setHierarchy(newHierarchy);
+  }, []);
 
   // Load courses when hierarchy changes
   useEffect(() => {
@@ -265,7 +268,7 @@ export const HierarchyProvider: React.FC<HierarchyProviderProps> = ({ children }
     } else {
       setCourses([]);
     }
-  }, [hierarchy, loadCourses]);
+  }, [hierarchy]); // Only depend on hierarchy, loadCourses is stable
 
   // Clear cache for admin users when they modify data
   const clearTopicCache = (courseId: string) => {
