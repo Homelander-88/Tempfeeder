@@ -772,19 +772,6 @@ const ContentView: React.FC<ContentViewProps> = ({
       const trimmedLine = line.trim();
       const leadingSpaces = line.length - line.trimLeft().length;
 
-      // Auto-detect code patterns (functions, algorithms, code-like syntax)
-      const isCodePattern = (line: string) => {
-        const trimmed = line.trim();
-        // Function definitions
-        if (trimmed.match(/^(function|def|class|public|private|void|int|string|bool|const|let|var)\s+\w+/)) return true;
-        // Algorithm/pseudocode patterns
-        if (trimmed.match(/^(if|for|while|do|BEGIN|END|READ|FOR|WHILE|IF|ELSE|RETURN)\s|\w+\([^)]*\)\s*[:{]|\w+\s*\([^)]*\)\s*{/)) return true;
-        // Array access patterns
-        if (trimmed.match(/[A-Z]\[[^\]]+\]/)) return true;
-        // Assignment with code-like syntax
-        if (trimmed.match(/^\w+\s*=\s*[^=]/) && (trimmed.includes('[') || trimmed.includes('(') || trimmed.includes('{'))) return true;
-        return false;
-      };
 
 
       // Table detection - Markdown format
@@ -1025,7 +1012,7 @@ const ContentView: React.FC<ContentViewProps> = ({
     }
 
     // Inline code (`code`) - preserve code exactly
-    formattedText = formattedText.replace(/`([^`\n]+)`/g, (match, code) => {
+    formattedText = formattedText.replace(/`([^`\n]+)`/g, (_match, code) => {
       // For inline code, we need to escape HTML but preserve the code structure
       const escapedCode = code
         .replace(/&/g, '&amp;')
@@ -1260,7 +1247,7 @@ const ContentView: React.FC<ContentViewProps> = ({
                                   height: '100%',
                                   objectFit: 'cover',
                                   borderRadius: '8px'
-                                }}
+                    }}
                               />
                     <div className="play-icon">▶</div>
                               {video.title && (
@@ -1284,7 +1271,7 @@ const ContentView: React.FC<ContentViewProps> = ({
                     className="content-add-btn"
                     onClick={() => {
                       setShowContentAddForm({ section: 'featuredVideo', visible: true });
-                      setContentAddFormData({ contentType: 'video', title: '', content: '' });
+                      setContentAddFormData({ contentType: 'video', title: '', content: '', resourceType: '' });
                     }}
                   >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1387,7 +1374,6 @@ const ContentView: React.FC<ContentViewProps> = ({
                 const isOpen = openResources.has(res.id);
                 const resourceType = res.metadata?.resourceType || 'ppt'; // Default to ppt for backward compatibility
                 const isPdf = resourceType === 'pdf';
-                const isPpt = resourceType === 'ppt';
 
                 return (
                   <div className="resource-item" key={index}>
@@ -1411,10 +1397,10 @@ const ContentView: React.FC<ContentViewProps> = ({
                         </div>
                         <div className="resource-preview-content">
                           <h3 className="resource-preview-title">
-                            {res.title || (isPdf ? 'PDF Document' : isPpt ? 'Presentation' : 'Resource')}
+                            {res.title || (isPdf ? 'PDF Document' : resourceType === 'ppt' ? 'Presentation' : 'Resource')}
                           </h3>
                           <p className="resource-preview-desc">
-                            Click to view {isPdf ? 'PDF document' : isPpt ? 'presentation slides' : 'external resource'}
+                            Click to view {isPdf ? 'PDF document' : resourceType === 'ppt' ? 'presentation slides' : 'external resource'}
                           </p>
                         </div>
                         <div className="resource-preview-arrow">
@@ -1523,7 +1509,7 @@ const ContentView: React.FC<ContentViewProps> = ({
                                 opacity: loadingResources.has(res.id) ? 0 : 1,
                                 transition: 'opacity 0.3s ease-in-out'
                               }}
-                            />
+                          />
                           )}
                         </div>
                       </>
@@ -1540,7 +1526,7 @@ const ContentView: React.FC<ContentViewProps> = ({
                       className="content-add-btn"
                       onClick={() => {
                         setShowContentAddForm({ section: 'driveResources', visible: true });
-                        setContentAddFormData({ contentType: 'drive', title: '', content: '' });
+                        setContentAddFormData({ contentType: 'drive', title: '', content: '', resourceType: 'ppt' });
                       }}
                     >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1691,7 +1677,7 @@ const ContentView: React.FC<ContentViewProps> = ({
                     className="content-add-btn"
                     onClick={() => {
                       setShowContentAddForm({ section: 'notes', visible: true });
-                      setContentAddFormData({ contentType: 'notes', title: '', content: '' });
+                      setContentAddFormData({ contentType: 'notes', title: '', content: '', resourceType: '' });
                     }}
                   >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1851,7 +1837,7 @@ const ContentView: React.FC<ContentViewProps> = ({
                       className="content-add-btn"
                       onClick={() => {
                         setShowContentAddForm({ section: 'questions', visible: true });
-                        setContentAddFormData({ contentType: 'question', title: '', content: '' });
+                        setContentAddFormData({ contentType: 'question', title: '', content: '', resourceType: '' });
                       }}
                     >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1930,7 +1916,6 @@ const ContentView: React.FC<ContentViewProps> = ({
     const hasMultipleResources = resources.length > 1;
     const resourceType = resource?.metadata?.resourceType || 'ppt';
     const isPdf = resourceType === 'pdf';
-    const isPpt = resourceType === 'ppt';
 
     const navigateToResource = (direction: 'prev' | 'next') => {
       if (!hasMultipleResources) return;
@@ -1977,7 +1962,7 @@ const ContentView: React.FC<ContentViewProps> = ({
                 <span className="resource-counter">
                   {currentIndex + 1} of {resources.length}
                 </span>
-              )}
+            )}
             </div>
             <button
               className="resource-fullscreen-exit-btn"
@@ -2027,7 +2012,7 @@ const ContentView: React.FC<ContentViewProps> = ({
                   opacity: loadingResources.has(resource.id) ? 0 : 1,
                   transition: 'opacity 0.3s ease-in-out'
                 }}
-              />
+            />
             )}
           </div>
         </div>

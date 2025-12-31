@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: spoonfeeder-backend
+    runtime: node
+    buildCommand: "npm install && npm run build"
+    startCommand: "npm start"
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: RENDER
+        value: true
+    healthCheckPath: /api/health
+    disk:
+      name: cache
+      mountPath: /tmp
+      sizeGB: 1
+    # Optimize for free tier
+    plan: free
+    region: singapore # Closest to most users
+    # Pre-warm settings
+    preDeployCommand: "echo 'Pre-deploy complete'"

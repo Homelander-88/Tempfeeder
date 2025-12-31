@@ -11,6 +11,14 @@ const pool = new Pool({
     database: process.env.DB_NAME,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
+    // Optimized for Render - Lower connection limits for free tier
+    max: process.env.NODE_ENV === 'production' ? 10 : 20, // Reduce for Render free tier
+    min: 1, // Keep 1 connection alive
+    idleTimeoutMillis: 45000, // Increased for Render's connection limits
+    connectionTimeoutMillis: 10000, // Increased timeout for network latency
+    allowExitOnIdle: true,
+    // SSL settings for production
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
 const supabaseUrl = process.env.SUPABASE_URL
@@ -26,12 +34,21 @@ export const supabase = createClient(supabaseUrl, supabaseServiceKey, {
     persistSession: false
   }
 })
-pool.on("connect",() =>{
-    console.log("Connected to supabase database...");
+// Proper error handling and logging for database connections
+pool.on("connect", (client) => {
+    console.log("New database connection established");
 });
 
-pool.on("error", (err)=>{
-    console.error("Database connection failed...",err);
+pool.on("error", (err, client) => {
+    console.error("Unexpected database error on idle client", {
+        error: err.message,
+        stack: err.stack,
+        client: client ? 'client exists' : 'no client'
+    });
+});
+
+pool.on("remove", (client) => {
+    console.log("Database connection removed from pool");
 });
 
 export default pool;

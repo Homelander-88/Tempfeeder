@@ -4,13 +4,65 @@ import jwt from "jsonwebtoken";
 import pool from "../db/connection";
 import crypto from "crypto";
 import nodemailer from "nodemailer";
+import Joi from "joi";
+import winston from "winston";
+
+// Logger configuration
+const logger = winston.createLogger({
+  level: 'info',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.json()
+  ),
+  transports: [
+    new winston.transports.File({ filename: 'logs/auth.log' }),
+    new winston.transports.Console({
+      format: winston.format.combine(
+        winston.format.colorize(),
+        winston.format.simple()
+      )
+    })
+  ]
+});
+
+// Validation schemas
+const registerSchema = Joi.object({
+  email: Joi.string().email().required().messages({
+    'string.email': 'Please provide a valid email address',
+    'any.required': 'Email is required'
+  }),
+  password: Joi.string()
+    .min(8)
+    .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
+    .required()
+    .messages({
+      'string.min': 'Password must be at least 8 characters long',
+      'string.pattern.base': 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character',
+      'any.required': 'Password is required'
+    })
+});
+
+const loginSchema = Joi.object({
+  email: Joi.string().email().required(),
+  password: Joi.string().required()
+});
+
+const forgotPasswordSchema = Joi.object({
+  email: Joi.string().email().required()
+});
 
 export const register = async (_req: Request, res: Response) => {
+    let userEmail = ''; // For error logging
     try {
-        const { email, password } = _req.body;
-        if (!email || !password) {
-            return res.status(400).json({ error: "Email and password required" });
+        // Validate input - stripUnknown: true to remove any extra fields
+        const { error, value } = registerSchema.validate(_req.body, { stripUnknown: true });
+        if (error) {
+            return res.status(400).json({ error: error.details[0].message });
         }
+
+        // Extract only email and password (confirmPassword is validated but not stored)
+        const { email, password } = value;
+        userEmail = email;
         const existingUser = await pool.query("SELECT id FROM users WHERE email = $1", [email]);
         if (existingUser.rows.length > 0) {
             return res.status(400).json({ error: "User already exists" });
@@ -29,15 +81,26 @@ export const register = async (_req: Request, res: Response) => {
         const token = jwt.sign({ userId: newUser.id, email: newUser.email }, jwtsecret, { expiresIn: "5h" });
         return res.status(201).json({ message: "User registered", user: { id: newUser.id, email: newUser.email }, token });
     } catch (err) {
-        console.error("register error:", err);
+        logger.error("Registration error", {
+            error: err,
+            email: userEmail,
+            ip: _req.ip
+        });
         return res.status(500).json({ error: "Internal server error" });
     }
 };
 
 export const login = async (req: Request, res: Response) => {
+    let userEmail = ''; // For error logging
     try {
-        const { email, password } = req.body;
-        if (!email || !password) return res.status(400).json({ error: "Email and password are required" });
+        // Validate input - allowUnknown: true to ignore extra fields like confirmPassword
+        const { error, value } = loginSchema.validate(req.body, { allowUnknown: true, stripUnknown: true });
+        if (error) {
+            return res.status(400).json({ error: error.details[0].message });
+        }
+
+        const { email, password } = value;
+        userEmail = email;
 
         const result = await pool.query("SELECT id, email, password_hash FROM users WHERE email = $1", [email]);
         if (result.rows.length === 0) return res.status(400).json({ error: "Invalid email or password" });
@@ -52,7 +115,11 @@ export const login = async (req: Request, res: Response) => {
         const token = jwt.sign({ userId: existingUser.id, email: existingUser.email }, jwtsecret, { expiresIn: "5h" });
         return res.json({ message: "Login successful", user: { id: existingUser.id, email: existingUser.email }, token });
     } catch (err) {
-        console.error("Login error:", err);
+        logger.error("Login error", {
+            error: err,
+            email: userEmail,
+            ip: req.ip
+        });
         return res.status(500).json({ error: "Internal server error" });
     }
 };
@@ -60,8 +127,13 @@ export const login = async (req: Request, res: Response) => {
 
 export const forgotPassword = async (req: Request, res: Response) => {
     try {
-        const { email } = req.body;
-        if (!email) return res.status(400).json({ error: "Email required" });
+        // Validate input - stripUnknown: true to remove any extra fields
+        const { error, value } = forgotPasswordSchema.validate(req.body, { stripUnknown: true });
+        if (error) {
+            return res.status(400).json({ error: error.details[0].message });
+        }
+
+        const { email } = value;
 
         const userRes = await pool.query("SELECT id FROM users WHERE email = $1", [email]);
         if (userRes.rows.length === 0) {

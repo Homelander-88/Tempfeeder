@@ -1,9 +1,64 @@
 import { useState, useEffect } from "react";
+import { ErrorBoundary } from "react-error-boundary";
 import Login from "./pages/Auth/auth";
 import ContentView from "./pages/ContentView/ContentView";
 import CollegeDepartment from "./pages/CollegeDepartment/collegeDepartment";
 import { HierarchyProvider } from "./context/HeirarchyContext";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+
+// Error fallback component
+function ErrorFallback({ error, resetErrorBoundary }: { error: Error; resetErrorBoundary: () => void }) {
+  return (
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'center',
+      alignItems: 'center',
+      height: '100vh',
+      background: '#0E0E10',
+      color: '#c4c7cc',
+      padding: '20px',
+      textAlign: 'center'
+    }}>
+      <div style={{ fontSize: '48px', marginBottom: '20px' }}>⚠️</div>
+      <h1 style={{ color: '#ff6b6b', marginBottom: '16px' }}>Something went wrong</h1>
+      <p style={{ marginBottom: '20px', maxWidth: '500px' }}>
+        We're sorry, but something unexpected happened. Please try refreshing the page.
+      </p>
+      <div style={{ fontSize: '12px', opacity: 0.6, marginBottom: '20px' }}>
+        Error: {error.message}
+      </div>
+      <div style={{ display: 'flex', gap: '12px' }}>
+        <button
+          onClick={resetErrorBoundary}
+          style={{
+            padding: '10px 20px',
+            background: '#2563EB',
+            color: 'white',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer'
+          }}
+        >
+          Try Again
+        </button>
+        <button
+          onClick={() => window.location.reload()}
+          style={{
+            padding: '10px 20px',
+            background: '#374151',
+            color: 'white',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer'
+          }}
+        >
+          Refresh Page
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function AppContent() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -46,13 +101,38 @@ function AppContent() {
     return (
       <div style={{
         display: 'flex',
+        flexDirection: 'column',
         justifyContent: 'center',
         alignItems: 'center',
         height: '100vh',
         background: '#0E0E10',
-        color: '#c4c7cc'
+        color: '#c4c7cc',
+        gap: '20px'
       }}>
-        Loading...
+        <div className="loading-spinner" style={{
+          width: '40px',
+          height: '40px',
+          border: '3px solid rgba(37, 99, 235, 0.1)',
+          borderTopColor: '#2563EB',
+          borderRadius: '50%',
+          animation: 'spin 0.8s linear infinite'
+        }}></div>
+        <style>
+          {`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}
+        </style>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '18px', fontWeight: '500', marginBottom: '8px' }}>
+            Loading SpoonFeeder
+          </div>
+          <div style={{ fontSize: '14px', opacity: 0.7 }}>
+            Setting up your learning environment...
+          </div>
+        </div>
       </div>
     );
   }
@@ -94,9 +174,11 @@ function AppContent() {
 
 function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <ErrorBoundary FallbackComponent={ErrorFallback}>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 

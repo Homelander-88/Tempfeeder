@@ -94,13 +94,17 @@ function Login({onNavigateToContent, onNavigateToCollegeDepartment, initialMode 
     setError(""); // Clear any previous errors
 
     try {
-      await login(formData);
+      // Only send email and password for login (not confirmPassword)
+      await login({
+        email: formData.email,
+        password: formData.password
+      });
       onNavigateToContent();
     } catch (err: any) {
       setError(err.response?.data?.error || "Login failed. Please try again.");
       setMode("error");
     }
-  }, [formData, login, onNavigateToContent]);
+  }, [formData.email, formData.password, login, onNavigateToContent]);
 
   const handleRegister = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,7 +118,8 @@ function Login({onNavigateToContent, onNavigateToCollegeDepartment, initialMode 
     try {
       await register({
         email: formData.email,
-        password: formData.password
+        password: formData.password,
+        confirmPassword: formData.confirmPassword
       });
       onNavigateToCollegeDepartment();
     } catch (err: any) {
