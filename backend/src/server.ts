@@ -4,7 +4,6 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
-import rateLimit from "express-rate-limit";
 import winston from "winston";
 import {fullRouter} from "./routes/index";
 
@@ -89,23 +88,6 @@ app.use(helmet({
   },
 }));
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: "Too many requests from this IP, please try again later.",
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-// Stricter rate limiting for auth endpoints (relaxed for development)
-const authLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute (reduced for easier testing)
-  max: 20, // limit each IP to 20 auth attempts per minute (increased)
-  message: "Too many authentication attempts, please try again later.",
-  standardHeaders: true,
-  legacyHeaders: false,
-});
 
 // Compression
 app.use(compression());
@@ -180,9 +162,6 @@ app.use(express.urlencoded({
     limit: '5mb'
 })); // Limit payload size
 
-// Apply rate limiting
-app.use('/api/auth/', authLimiter);
-app.use(limiter);
 
 // Apply caching to read-heavy endpoints (not auth)
 app.use('/api/health', cacheMiddleware(30000)); // Cache health check for 30 seconds
