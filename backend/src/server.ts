@@ -70,12 +70,28 @@ async function testConnection(){
         logger.info("Connected to PostgreSQL database", {
             databaseTime: result.rows[0].now
         });
+        return true;
     }catch(err){
         logger.error("Database connection failed", { error: err });
-        process.exit(1); // Exit if database connection fails
+        throw err; // Re-throw to be handled by caller
     }
 }
-testConnection();
+
+// Handle unhandled promise rejections (critical for async route handlers)
+process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
+    logger.error('Unhandled Rejection at:', { promise, reason });
+    // Don't exit in production, but log it
+    if (process.env.NODE_ENV === 'development') {
+        console.error('Unhandled Rejection:', reason);
+    }
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error: Error) => {
+    logger.error('Uncaught Exception:', { error: error.message, stack: error.stack });
+    // Exit on uncaught exception (server is in unknown state)
+    process.exit(1);
+});
 // Security middleware
 app.use(helmet({
   contentSecurityPolicy: {
@@ -109,6 +125,28 @@ app.use((req: express.Request, res: express.Response, next: express.NextFunction
   next();
 });
 
+// Hard request timeout safety net - prevents infinite hanging requests
+// This guarantees no request can hang forever, even if something goes wrong
+app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const TIMEOUT_MS = 25000; // 25 seconds (matches Render's timeout)
+  const timer = setTimeout(() => {
+    if (!res.headersSent) {
+      logger.warn('Request timeout - forcing response', {
+        method: req.method,
+        url: req.url,
+        timeout: `${TIMEOUT_MS}ms`
+      });
+      res.status(504).json({ error: 'Request timeout' });
+    }
+  }, TIMEOUT_MS);
+
+  // Clear timeout when response finishes (success or error)
+  res.on('finish', () => clearTimeout(timer));
+  res.on('close', () => clearTimeout(timer)); // Also clear on connection close
+  
+  next();
+});
+
 // CORS configuration - Allow all localhost ports and production domains
 const corsOptions = {
   origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
@@ -123,7 +161,7 @@ const corsOptions = {
       'http://localhost:8080', // Another common dev port
       'https://spoonfeeders.vercel.app', // Production Vercel
       'https://spoonfeeder-three.vercel.app', // Alternative Vercel
-      'https://tempfeeder.vercel.app', // Temporary Vercel
+      'https://tempfeeder.vercel.app', // Alternative Vercel
       process.env.FRONTEND_URL // Environment variable
     ].filter(Boolean); // Remove undefined values
 
@@ -216,54 +254,66 @@ process.on('SIGINT', () => {
   });
 });
 
-// Optimize server for production
-const server = app.listen(PORT,() => {
-    logger.info(`Server is running on port ${PORT}`, {
-        port: PORT,
-        environment: process.env.NODE_ENV || 'development',
-        nodeVersion: process.version,
-        memoryLimit: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + 'MB',
-        platform: process.platform
-    });
-});
+// Start server only after database connection is ready
+async function startServer() {
+    try {
+        // Wait for database connection before starting server
+        await testConnection();
+        
+        const server = app.listen(PORT, () => {
+            logger.info(`Server is running on port ${PORT}`, {
+                port: PORT,
+                environment: process.env.NODE_ENV || 'development',
+                nodeVersion: process.version,
+                memoryLimit: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + 'MB',
+                platform: process.platform
+            });
+        });
 
-// Render-specific optimizations
-if (process.env.RENDER || process.env.NODE_ENV === 'production') {
-    // Render-specific settings for better cold start performance
-    server.keepAliveTimeout = 75000; // 75 seconds (Render's timeout)
-    server.headersTimeout = 76000;
-    server.timeout = 25000; // 25 seconds (Render's request timeout)
+        // Render-specific optimizations
+        if (process.env.RENDER || process.env.NODE_ENV === 'production') {
+            // Render-specific settings for better cold start performance
+            server.keepAliveTimeout = 75000; // 75 seconds (Render's timeout)
+            server.headersTimeout = 76000;
+            server.timeout = 25000; // 25 seconds (Render's request timeout)
 
-    // Limit concurrent connections for Render free tier
-    server.maxConnections = 50;
+            // Limit concurrent connections for Render free tier (conservative limit)
+            server.maxConnections = 25;
 
-    // Enable TCP keep-alive for persistent connections
-    server.on('connection', (socket) => {
-        socket.setKeepAlive(true, 60000); // 60 seconds
-        socket.setTimeout(25000);
-    });
+            // Enable TCP keep-alive for persistent connections
+            server.on('connection', (socket) => {
+                socket.setKeepAlive(true, 60000); // 60 seconds
+                socket.setTimeout(25000);
+            });
 
-    // Clean up cache periodically to prevent memory bloat
-    setInterval(() => {
-        const now = Date.now();
-        for (const [key, value] of cache.entries()) {
-            if (now - value.timestamp > CACHE_TTL) {
-                cache.delete(key);
+            // Clean up cache periodically to prevent memory bloat
+            setInterval(() => {
+                const now = Date.now();
+                for (const [key, value] of cache.entries()) {
+                    if (now - value.timestamp > CACHE_TTL) {
+                        cache.delete(key);
+                    }
+                }
+                // Force garbage collection hint (V8 optimization)
+                if (global.gc) {
+                    global.gc();
+                }
+            }, 300000); // Every 5 minutes
+        }
+
+        // Handle server startup errors
+        server.on('error', (error: any) => {
+            if (error.code === 'EADDRINUSE') {
+                logger.error(`Port ${PORT} is already in use`, { error: error.message });
+            } else {
+                logger.error('Server startup error', { error: error.message });
             }
-        }
-        // Force garbage collection hint (V8 optimization)
-        if (global.gc) {
-            global.gc();
-        }
-    }, 300000); // Every 5 minutes
+            process.exit(1);
+        });
+    } catch (error) {
+        logger.error('Failed to start server - database connection failed', { error });
+        process.exit(1);
+    }
 }
 
-// Handle server startup errors
-server.on('error', (error: any) => {
-  if (error.code === 'EADDRINUSE') {
-    logger.error(`Port ${PORT} is already in use`, { error: error.message });
-  } else {
-    logger.error('Server startup error', { error: error.message });
-  }
-  process.exit(1);
-});
+startServer();
