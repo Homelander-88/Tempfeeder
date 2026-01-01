@@ -123,6 +123,7 @@ const corsOptions = {
       'http://localhost:8080', // Another common dev port
       'https://spoonfeeders.vercel.app', // Production Vercel
       'https://spoonfeeder-three.vercel.app', // Alternative Vercel
+      'https://tempfeeder.vercel.app', // Temporary Vercel
       process.env.FRONTEND_URL // Environment variable
     ].filter(Boolean); // Remove undefined values
 
