@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import './collegeDepartment.css';
 import { getColleges } from '../../api/colleges';
 import { getDepartmentsByCollegeName } from '../../api/department';
@@ -27,85 +27,113 @@ const CollegeDepartment = ({ onNavigateToContent }: CollegeDepartmentProps) => {
   const [colleges, setColleges] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
   const [semesters, setSemesters] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string>('');
 
-  // Load colleges on component mount
+  // 🔒 separate loaders & errors (logic only)
+  const [loadingColleges, setLoadingColleges] = useState(false);
+  const [loadingDepartments, setLoadingDepartments] = useState(false);
+  const [loadingSemesters, setLoadingSemesters] = useState(false);
+
+  const [collegeError, setCollegeError] = useState('');
+  const [departmentError, setDepartmentError] = useState('');
+  const [semesterError, setSemesterError] = useState('');
+
+  // 🔒 async guards
+  const departmentReqId = useRef(0);
+  const semesterReqId = useRef(0);
+
+  /* =====================
+     EFFECTS
+  ====================== */
+
   useEffect(() => {
     loadColleges();
   }, []);
 
-  // Load departments when college is selected
   useEffect(() => {
-    if (hierarchy.college) {
-      loadDepartments();
-    }
+    if (!hierarchy.college) return;
+    setDepartments([]);
+    setSemesters([]);
+    setDepartmentError('');
+    setSemesterError('');
+    loadDepartments();
   }, [hierarchy.college]);
 
-  // Load semesters when department is selected
   useEffect(() => {
-    if (hierarchy.department) {
-      loadSemesters();
-    }
+    if (!hierarchy.department) return;
+    setSemesters([]);
+    setSemesterError('');
+    loadSemesters();
   }, [hierarchy.department]);
+
+  /* =====================
+     LOADERS
+  ====================== */
 
   const loadColleges = async () => {
     try {
-      setLoading(true);
+      setLoadingColleges(true);
+      setCollegeError('');
       const response = await getColleges();
       setColleges(response.data);
-    } catch (err) {
-      console.error('Failed to load colleges:', err);
-      setError('Failed to load colleges');
+    } catch {
+      setCollegeError('Failed to load colleges');
     } finally {
-      setLoading(false);
+      setLoadingColleges(false);
     }
   };
 
   const loadDepartments = async () => {
+    const id = ++departmentReqId.current;
     try {
-      setLoading(true);
+      setLoadingDepartments(true);
+      setDepartmentError('');
       const response = await getDepartmentsByCollegeName(hierarchy.college);
+      if (id !== departmentReqId.current) return;
       setDepartments(response.data);
-    } catch (err) {
-      console.error('Failed to load departments:', err);
-      setError('Failed to load departments');
+    } catch {
+      setDepartmentError('Failed to load departments');
+      setDepartments([]);
     } finally {
-      setLoading(false);
+      if (id === departmentReqId.current) setLoadingDepartments(false);
     }
   };
 
   const loadSemesters = async () => {
+    const id = ++semesterReqId.current;
     try {
-      setLoading(true);
-      const response = await getSemestersByNames(hierarchy.department, hierarchy.college);
+      setLoadingSemesters(true);
+      setSemesterError('');
+      const response = await getSemestersByNames(
+        hierarchy.department,
+        hierarchy.college
+      );
+      if (id !== semesterReqId.current) return;
       setSemesters(response.data);
-    } catch (err) {
-      console.error('Failed to load semesters:', err);
-      setError('Failed to load semesters');
+    } catch {
+      setSemesterError('Failed to load semesters');
+      setSemesters([]);
     } finally {
-      setLoading(false);
+      if (id === semesterReqId.current) setLoadingSemesters(false);
     }
   };
+
+  /* =====================
+     HANDLERS
+  ====================== */
 
   const handleSelection = (field: keyof HierarchyData, value: string) => {
     const newHierarchy = {
       ...hierarchy,
       [field]: value,
-      // Clear subsequent fields when changing parent selection
       ...(field === 'college' && { department: '', semester: '' }),
       ...(field === 'department' && { semester: '' }),
     };
+
     setHierarchy(newHierarchy);
 
-    // Move to next step
-    if (field === 'college') {
-      setCurrentStep('department');
-    } else if (field === 'department') {
-      setCurrentStep('semester');
-    } else if (field === 'semester') {
-      handleComplete(newHierarchy);
-    }
+    if (field === 'college') setCurrentStep('department');
+    else if (field === 'department') setCurrentStep('semester');
+    else handleComplete(newHierarchy);
   };
 
   const handleBack = () => {
@@ -119,13 +147,19 @@ const CollegeDepartment = ({ onNavigateToContent }: CollegeDepartmentProps) => {
   };
 
   const handleComplete = (completedHierarchy?: HierarchyData) => {
-    const hierarchyToStore = completedHierarchy || hierarchy;
-    // Store the hierarchy details in localStorage
-    localStorage.setItem('hierarchy', JSON.stringify(hierarchyToStore));
-
-    // Navigate to content
+    localStorage.setItem(
+      'hierarchy',
+      JSON.stringify(completedHierarchy || hierarchy)
+    );
     onNavigateToContent();
   };
+
+  /* =====================
+     RENDER (UI UNCHANGED)
+  ====================== */
+
+  const loading = loadingColleges || loadingDepartments || loadingSemesters;
+  const error = collegeError || departmentError || semesterError;
 
   const renderCollegeStep = () => (
     <div className="step-content">
@@ -139,7 +173,7 @@ const CollegeDepartment = ({ onNavigateToContent }: CollegeDepartmentProps) => {
         {loading ? (
           <div className="loading">Loading colleges...</div>
         ) : (
-          colleges.map((college) => (
+          colleges.map(college => (
             <button
               key={college.id}
               className="selection-card"
@@ -155,11 +189,8 @@ const CollegeDepartment = ({ onNavigateToContent }: CollegeDepartmentProps) => {
 
   const renderDepartmentStep = () => (
     <div className="step-content">
-
       <div className="step-header">
-        <div className="step-nav">
-
-        </div>
+        <div className="step-nav"></div>
         <h2>Select Your Department</h2>
         <p>Choose your department in {hierarchy.college}</p>
       </div>
@@ -170,11 +201,13 @@ const CollegeDepartment = ({ onNavigateToContent }: CollegeDepartmentProps) => {
         {loading ? (
           <div className="loading">Loading departments...</div>
         ) : (
-          departments.map((department) => (
+          departments.map(department => (
             <button
               key={department.id}
               className="selection-card"
-              onClick={() => handleSelection('department', department.name)}
+              onClick={() =>
+                handleSelection('department', department.name)
+              }
             >
               <h3>{department.name}</h3>
             </button>
@@ -187,8 +220,7 @@ const CollegeDepartment = ({ onNavigateToContent }: CollegeDepartmentProps) => {
   const renderSemesterStep = () => (
     <div className="step-content">
       <div className="step-header">
-        <div className="step-nav">
-        </div>
+        <div className="step-nav"></div>
         <h2>Select Your Semester</h2>
         <p>Choose your current semester in {hierarchy.department}</p>
       </div>
@@ -199,11 +231,13 @@ const CollegeDepartment = ({ onNavigateToContent }: CollegeDepartmentProps) => {
         {loading ? (
           <div className="loading">Loading semesters...</div>
         ) : semesters.length > 0 ? (
-          semesters.map((semester) => (
+          semesters.map(semester => (
             <button
               key={semester.id}
               className="selection-card"
-              onClick={() => handleSelection('semester', semester.name)}
+              onClick={() =>
+                handleSelection('semester', semester.name)
+              }
             >
               <h3>{semester.name}</h3>
             </button>
@@ -211,7 +245,9 @@ const CollegeDepartment = ({ onNavigateToContent }: CollegeDepartmentProps) => {
         ) : (
           <div className="no-data">
             <p>No semesters found for {hierarchy.department}</p>
-            <p>Available semesters in database may not match the department name.</p>
+            <p>
+              Available semesters in database may not match the department name.
+            </p>
           </div>
         )}
       </div>
@@ -221,13 +257,14 @@ const CollegeDepartment = ({ onNavigateToContent }: CollegeDepartmentProps) => {
   return (
     <div className="college-department-container">
       {currentStep !== 'college' && (
-          <button className="back-button" onClick={handleBack} aria-label="Go back">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="19" y1="12" x2="5" y2="12"></line>
-              <polyline points="12 19 5 12 12 5"></polyline>
-            </svg>
-          </button>
+        <button className="back-button" onClick={handleBack} aria-label="Go back">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+          </svg>
+        </button>
       )}
+
       <div className="college-department-card">
         <div className="step-indicator">
           <div className={`step-dot ${currentStep === 'college' || currentStep === 'department' || currentStep === 'semester' ? 'active' : ''}`}>1</div>
