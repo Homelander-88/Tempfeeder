@@ -62,19 +62,33 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = parseInt(process.env.PORT || "5000", 10);
 
-async function testConnection(){
-    try{
-        const result = await pool.query("SELECT NOW()");
-        logger.info("Connected to PostgreSQL database", {
-            databaseTime: result.rows[0].now
-        });
-        return true;
-    }catch(err){
-        logger.error("Database connection failed", { error: err });
-        throw err; // Re-throw to be handled by caller
+async function testConnection(retries: number = 3, delay: number = 2000){
+    for (let i = 0; i < retries; i++) {
+        try{
+            const result = await pool.query("SELECT NOW()");
+            logger.info("Connected to PostgreSQL database", {
+                databaseTime: result.rows[0].now,
+                attempt: i + 1
+            });
+            return true;
+        }catch(err){
+            if (i === retries - 1) {
+                // Last attempt failed
+                logger.error("Database connection failed after all retries", { 
+                    error: err,
+                    attempts: retries 
+                });
+                throw err;
+            }
+            logger.warn(`Database connection attempt ${i + 1} failed, retrying in ${delay}ms...`, { 
+                error: err instanceof Error ? err.message : String(err)
+            });
+            await new Promise(resolve => setTimeout(resolve, delay));
+        }
     }
+    return false;
 }
 
 // Handle unhandled promise rejections (critical for async route handlers)
@@ -259,9 +273,10 @@ async function startServer() {
         // Wait for database connection before starting server
         await testConnection();
         
-        const server = app.listen(PORT, () => {
+        const server = app.listen(PORT, "0.0.0.0", () => {
             logger.info(`Server is running on port ${PORT}`, {
                 port: PORT,
+                host: "0.0.0.0",
                 environment: process.env.NODE_ENV || 'development',
                 nodeVersion: process.version,
                 memoryLimit: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + 'MB',

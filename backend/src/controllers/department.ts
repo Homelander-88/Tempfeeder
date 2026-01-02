@@ -19,12 +19,12 @@ export const getDepartments = async(_req:Request,res:Response) =>{
       query = "SELECT id, college_id as \"collegeId\", name FROM departments WHERE college_id = $1 ORDER BY id";
       params = [collegeId];
     } else if (collegeNameParam) {
-      // Get by college name
+      // Get by college name (case-insensitive, trim whitespace)
       query = `
         SELECT d.id, d.college_id as "collegeId", d.name
         FROM departments d
         JOIN colleges c ON d.college_id = c.id
-        WHERE c.name = $1
+        WHERE LOWER(TRIM(c.name)) = LOWER(TRIM($1))
         ORDER BY d.id
       `;
       params = [collegeNameParam];

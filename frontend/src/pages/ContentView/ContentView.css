@@ -1302,6 +1302,7 @@ body {
   animation: resourceExpand 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
+
 .resource-loading {
   position: absolute;
   top: 0;
@@ -1793,10 +1794,27 @@ body {
   transition: all 0.2s ease;
 }
 
-.content-add-btn:hover {
+.content-add-btn:hover:not(:disabled) {
   background: rgba(37, 99, 235, 0.15);
   border-color: var(--primary-accent);
   transform: translateY(-1px);
+}
+
+.content-add-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.content-add-btn.success {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+}
+
+.content-add-btn.error {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
 }
 
 .content-add-form {
@@ -1850,6 +1868,76 @@ body {
 .content-form-select:focus {
   outline: none;
   border-color: var(--primary-accent);
+}
+
+.add-form-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.add-form-submit,
+.add-form-cancel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.add-form-submit {
+  background: var(--primary-accent);
+  color: white;
+}
+
+.add-form-submit:hover:not(:disabled) {
+  background: rgba(37, 99, 235, 0.8);
+  transform: translateY(-1px);
+}
+
+.add-form-submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.add-form-submit.success {
+  background: #22c55e;
+}
+
+.add-form-submit.error {
+  background: #ef4444;
+}
+
+.add-form-cancel {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+}
+
+.add-form-cancel:hover {
+  background: var(--background-dark);
+  border-color: var(--border-primary);
+}
+
+/* Loading spinner animation */
+.loading-spinner circle {
+  transform-origin: center;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 
@@ -2432,3 +2520,4 @@ body {
   border: none;
   background: var(--background-dark);
 }
+

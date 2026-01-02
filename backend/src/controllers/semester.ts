@@ -19,13 +19,13 @@ import pool from "../db/connection";
       query = "SELECT id,department_id as \"departmentId\",name FROM semesters WHERE department_id = $1 ORDER BY id";
       params = [departmentId];
     } else if (departmentNameParam && collegeNameParam) {
-      // Get by department and college names
+      // Get by department and college names (case-insensitive, trim whitespace)
       query = `
         SELECT s.id, s.department_id as "departmentId", s.name
         FROM semesters s
         JOIN departments d ON s.department_id = d.id
         JOIN colleges c ON d.college_id = c.id
-        WHERE d.name = $1 AND c.name = $2
+        WHERE LOWER(TRIM(d.name)) = LOWER(TRIM($1)) AND LOWER(TRIM(c.name)) = LOWER(TRIM($2))
         ORDER BY s.id
       `;
       params = [departmentNameParam, collegeNameParam];

@@ -39,24 +39,30 @@ const CollegeDepartment = ({ onNavigateToContent }: CollegeDepartmentProps) => {
   useEffect(() => {
     if (hierarchy.college) {
       loadDepartments();
+    } else {
+      setDepartments([]); // Clear departments if college is cleared
     }
   }, [hierarchy.college]);
 
-  // Load semesters when department is selected
+  // Load semesters when department is selected (depends on both department AND college)
   useEffect(() => {
-    if (hierarchy.department) {
+    if (hierarchy.department && hierarchy.college) {
       loadSemesters();
+    } else {
+      setSemesters([]); // Clear semesters if department or college is missing
     }
-  }, [hierarchy.department]);
+  }, [hierarchy.department, hierarchy.college]);
 
   const loadColleges = async () => {
     try {
       setLoading(true);
+      setError(''); // Clear previous errors
       const response = await getColleges();
-      setColleges(response.data);
+      setColleges(response.data || []);
     } catch (err) {
       console.error('Failed to load colleges:', err);
       setError('Failed to load colleges');
+      setColleges([]); // Clear colleges on error
     } finally {
       setLoading(false);
     }
@@ -65,11 +71,13 @@ const CollegeDepartment = ({ onNavigateToContent }: CollegeDepartmentProps) => {
   const loadDepartments = async () => {
     try {
       setLoading(true);
+      setError(''); // Clear previous errors
       const response = await getDepartmentsByCollegeName(hierarchy.college);
-      setDepartments(response.data);
+      setDepartments(Array.isArray(response.data) ? response.data : []);
     } catch (err) {
       console.error('Failed to load departments:', err);
       setError('Failed to load departments');
+      setDepartments([]); // Clear departments on error
     } finally {
       setLoading(false);
     }
@@ -78,11 +86,13 @@ const CollegeDepartment = ({ onNavigateToContent }: CollegeDepartmentProps) => {
   const loadSemesters = async () => {
     try {
       setLoading(true);
+      setError(''); // Clear previous errors
       const response = await getSemestersByNames(hierarchy.department, hierarchy.college);
-      setSemesters(response.data);
+      setSemesters(response.data || []);
     } catch (err) {
       console.error('Failed to load semesters:', err);
       setError('Failed to load semesters');
+      setSemesters([]); // Clear semesters on error
     } finally {
       setLoading(false);
     }
@@ -138,7 +148,7 @@ const CollegeDepartment = ({ onNavigateToContent }: CollegeDepartmentProps) => {
       <div className="selection-grid">
         {loading ? (
           <div className="loading">Loading colleges...</div>
-        ) : (
+        ) : Array.isArray(colleges) && colleges.length > 0 ? (
           colleges.map((college) => (
             <button
               key={college.id}
@@ -148,6 +158,10 @@ const CollegeDepartment = ({ onNavigateToContent }: CollegeDepartmentProps) => {
               <h3>{college.name}</h3>
             </button>
           ))
+        ) : (
+          <div className="no-data">
+            <p>No colleges available</p>
+          </div>
         )}
       </div>
     </div>
@@ -169,7 +183,7 @@ const CollegeDepartment = ({ onNavigateToContent }: CollegeDepartmentProps) => {
       <div className="selection-grid">
         {loading ? (
           <div className="loading">Loading departments...</div>
-        ) : (
+        ) : Array.isArray(departments) && departments.length > 0 ? (
           departments.map((department) => (
             <button
               key={department.id}
@@ -179,6 +193,10 @@ const CollegeDepartment = ({ onNavigateToContent }: CollegeDepartmentProps) => {
               <h3>{department.name}</h3>
             </button>
           ))
+        ) : (
+          <div className="no-data">
+            <p>No departments available for {hierarchy.college}</p>
+          </div>
         )}
       </div>
     </div>
@@ -198,7 +216,7 @@ const CollegeDepartment = ({ onNavigateToContent }: CollegeDepartmentProps) => {
       <div className="selection-grid">
         {loading ? (
           <div className="loading">Loading semesters...</div>
-        ) : semesters.length > 0 ? (
+        ) : Array.isArray(semesters) && semesters.length > 0 ? (
           semesters.map((semester) => (
             <button
               key={semester.id}

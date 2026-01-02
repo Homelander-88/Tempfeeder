@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import type { JSX } from "react";
 import Header from "../../components/Header/Header";
 import Sidebar from "../../components/Sidebar/Sidebar";
@@ -67,12 +67,16 @@ const ContentView: React.FC<ContentViewProps> = ({
   }, [mode]);
   const { selectedSubtopic, hierarchy, selectedCourse, selectedTopic, courses, topics, subtopics, setSelectedCourse, setSelectedTopic, setSelectedSubtopic, loadTopics, loadSubtopics, loadContent, loadCourses, setHierarchy, clearTopicCache, clearSubtopicCache } = useHierarchy();
 
-  // Debug logging for topics state
-  console.log('ContentView render - topics:', topics, 'selectedCourse:', selectedCourse);
+  // Debug logging for topics state (only in development)
+  if (import.meta.env.DEV) {
+    console.log('ContentView render - topics:', topics, 'selectedCourse:', selectedCourse);
+  }
 
-  // Debug when topics change
+  // Debug when topics change (only in development)
   useEffect(() => {
-    console.log('ContentView - topics changed:', topics);
+    if (import.meta.env.DEV) {
+      console.log('ContentView - topics changed:', topics);
+    }
   }, [topics]);
   const { isAdmin } = useAuth();
   const [contentData, setContentData] = useState<any>(null);
@@ -98,6 +102,7 @@ const ContentView: React.FC<ContentViewProps> = ({
     content: '',
     resourceType: 'ppt' // 'pdf' or 'ppt'
   });
+  const [addResourceStatus, setAddResourceStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [adminFormData, setAdminFormData] = useState({
     name: '',
     collegeId: '',
@@ -154,6 +159,46 @@ const ContentView: React.FC<ContentViewProps> = ({
       setShowAddForm({ mode: '', visible: false });
     } catch (error) {
       console.error('Error adding item:', error);
+    }
+  };
+
+  const handleAddResource = async () => {
+    if (!selectedSubtopic || !contentAddFormData.title.trim() || !contentAddFormData.content.trim()) {
+      return;
+    }
+
+    setAddResourceStatus('loading');
+
+    try {
+      await createSubtopicContent(parseInt(selectedSubtopic.id), {
+        contentType: 'drive',
+        contentOrder: 1,
+        title: contentAddFormData.title,
+        content: contentAddFormData.content,
+        metadata: { resourceType: contentAddFormData.resourceType }
+      });
+
+      setAddResourceStatus('success');
+
+      // Refresh content
+      loadContentData();
+      setShowContentAddForm({ section: '', visible: false });
+
+      // Reset status after showing success for a moment
+      setTimeout(() => {
+        setAddResourceStatus('idle');
+        // Clear form data
+        setContentAddFormData({ contentType: 'drive', title: '', content: '', resourceType: 'ppt' });
+      }, 1500);
+
+    } catch (error) {
+      console.error('Error adding resource:', error);
+      setAddResourceStatus('error');
+
+      // Reset status after showing error for a moment
+      setTimeout(() => {
+        setAddResourceStatus('idle');
+      }, 3000);
     }
   };
 
@@ -221,26 +266,30 @@ const ContentView: React.FC<ContentViewProps> = ({
   };
 
   
-  // Session-level content cache using sessionStorage
-  const getContentFromCache = (subtopicId: string): any | null => {
+  // Session-level content cache using sessionStorage - memoized to prevent recreation
+  const getContentFromCache = useCallback((subtopicId: string): any | null => {
     try {
       const cacheKey = `content_cache_${subtopicId}`;
       const cached = sessionStorage.getItem(cacheKey);
       return cached ? JSON.parse(cached) : null;
     } catch (error) {
-      console.error('Error reading from cache:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error reading from cache:', error);
+      }
       return null;
     }
-  };
+  }, []);
 
-  const setContentInCache = (subtopicId: string, content: any) => {
+  const setContentInCache = useCallback((subtopicId: string, content: any) => {
     try {
       const cacheKey = `content_cache_${subtopicId}`;
       sessionStorage.setItem(cacheKey, JSON.stringify(content));
     } catch (error) {
-      console.error('Error writing to cache:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error writing to cache:', error);
+      }
     }
-  };
+  }, []);
 
   const notesRef = useRef<HTMLDivElement>(null);
   const [showToolbar, setShowToolbar] = useState(false);
@@ -335,7 +384,16 @@ const ContentView: React.FC<ContentViewProps> = ({
       // Check sessionStorage cache first (only for non-admin users)
       const cachedContent = getContentFromCache(subtopicId);
       if (cachedContent) {
-        setContentData(cachedContent);
+        // Ensure cached content has all required array properties
+        const safeCachedContent = {
+          ...cachedContent,
+          videos: Array.isArray(cachedContent.videos) ? cachedContent.videos : [],
+          driveResources: Array.isArray(cachedContent.driveResources) ? cachedContent.driveResources : [],
+          notesItems: Array.isArray(cachedContent.notesItems) ? cachedContent.notesItems : [],
+          questions: Array.isArray(cachedContent.questions) ? cachedContent.questions : [],
+          notes: cachedContent.notes || ''
+        };
+        setContentData(safeCachedContent);
         setIsLoadingContent(false);
         // Don't auto-load sections - let them load progressively when viewed
         return;
@@ -368,6 +426,7 @@ const ContentView: React.FC<ContentViewProps> = ({
           videos: [],
           driveResources: [],
           notes: "",
+          notesItems: [],
           questions: []
         };
         setContentData(emptyContent);
@@ -383,6 +442,7 @@ const ContentView: React.FC<ContentViewProps> = ({
         videos: [],
         driveResources: [],
         notes: "",
+        notesItems: [],
         questions: []
       };
       setContentData(emptyContent);
@@ -405,6 +465,19 @@ const ContentView: React.FC<ContentViewProps> = ({
       notes: [],
       questions: []
     };
+
+    // Safety check: ensure backendContent is an array
+    if (!Array.isArray(backendContent)) {
+      return {
+        title: selectedSubtopic?.name || 'Content',
+        videos: [],
+        featuredVideo: null,
+        driveResources: [],
+        notes: '',
+        notesItems: [],
+        questions: []
+      };
+    }
 
     backendContent.forEach(item => {
       // Handle both content_type and contentType (backend may use either)
@@ -641,6 +714,42 @@ const ContentView: React.FC<ContentViewProps> = ({
   const getYoutubeId = (url: string) => {
     const match = url.match(/(?:v=|\/)([0-9A-Za-z_-]{11})/);
     return match ? match[1] : "";
+  };
+
+  const getEmbeddedUrl = (url: string, isPdf: boolean) => {
+    if (isPdf) {
+      // Extract filename from URL (handle both full URLs and just filenames)
+      let filename: string;
+      if (url.startsWith("http")) {
+        // Extract filename from full URL
+        const urlParts = url.split('/');
+        filename = urlParts[urlParts.length - 1].split('?')[0]; // Remove query params if any
+      } else {
+        // Already just a filename
+        filename = url;
+      }
+
+      // Build Cloudflare Worker URL with filename as route
+      const workerBaseUrl = 'https://pdf-storage.suganthr09.workers.dev';
+      const workerUrl = `${workerBaseUrl}/${filename}`;
+
+      if (import.meta.env.DEV) {
+        console.log('🔗 PDF URL - Original:', url);
+        console.log('🔗 PDF URL - Filename:', filename);
+        console.log('🔗 PDF URL - Worker URL:', workerUrl);
+      }
+
+      // Direct embed of Cloudflare Worker URL (no PDF.js viewer)
+      return workerUrl;
+    } else {
+      // For PPTs and other files: Use Google Docs viewer with preview URL
+      // Extract file ID from Google Drive sharing URL
+      const fileIdMatch = url.match(/\/file\/d\/([a-zA-Z0-9-_]+)/);
+      if (!fileIdMatch) return url;
+
+      const fileId = fileIdMatch[1];
+      return `https://docs.google.com/viewer?url=${encodeURIComponent(`https://drive.google.com/uc?id=${fileId}`)}&embedded=true`;
+    }
   };
 
   const getYoutubeThumbnail = (url: string, qualityIndex: number = 0) => {
@@ -1370,10 +1479,12 @@ const ContentView: React.FC<ContentViewProps> = ({
               )}
             </div>
             <div className="drive-resources-container">
-              {contentData.driveResources.map((res: any, index: number) => {
+              {contentData.driveResources && Array.isArray(contentData.driveResources) && contentData.driveResources.map((res: any, index: number) => {
                 const isOpen = openResources.has(res.id);
-                const resourceType = res.metadata?.resourceType || 'ppt'; // Default to ppt for backward compatibility
-                const isPdf = resourceType === 'pdf';
+                // FIX: PDF DETECTION - Infer from URL extension (most reliable)
+                // ❌ Don't rely on backend metadata that might be wrong
+                // ✅ Check if URL ends with .pdf
+                const isPdf = res.url?.toLowerCase().endsWith('.pdf') || false;
 
                 return (
                   <div className="resource-item" key={index}>
@@ -1397,10 +1508,10 @@ const ContentView: React.FC<ContentViewProps> = ({
                         </div>
                         <div className="resource-preview-content">
                           <h3 className="resource-preview-title">
-                            {res.title || (isPdf ? 'PDF Document' : resourceType === 'ppt' ? 'Presentation' : 'Resource')}
+                            {res.title || (isPdf ? 'PDF Document' : 'Presentation')}
                           </h3>
                           <p className="resource-preview-desc">
-                            Click to view {isPdf ? 'PDF document' : resourceType === 'ppt' ? 'presentation slides' : 'external resource'}
+                            Click to view {isPdf ? 'PDF document' : 'presentation slides'}
                           </p>
                         </div>
                         <div className="resource-preview-arrow">
@@ -1476,41 +1587,33 @@ const ContentView: React.FC<ContentViewProps> = ({
                               <span className="resource-loading-text">Loading resource...</span>
                             </div>
                           )}
-                          {isPdf ? (
-                            // Use Google Docs PDF viewer for PDFs
-                            <iframe
-                              className="resource-frame"
-                              src={`https://docs.google.com/viewer?url=${encodeURIComponent(res.url)}&embedded=true`}
-                              allow="autoplay"
-                              title={res.title}
-                              onLoad={() => setLoadingResources(prev => {
-                                const newSet = new Set(prev);
-                                newSet.delete(res.id);
-                                return newSet;
-                              })}
-                              style={{
-                                opacity: loadingResources.has(res.id) ? 0 : 1,
-                                transition: 'opacity 0.3s ease-in-out'
-                              }}
-                            />
-                          ) : (
-                            // Use direct iframe for PPTs (which work fine)
-                          <iframe
-                            className="resource-frame"
-                            src={res.url}
-                            allow="autoplay"
-                            title={res.title}
-                              onLoad={() => setLoadingResources(prev => {
-                                const newSet = new Set(prev);
-                                newSet.delete(res.id);
-                                return newSet;
-                              })}
-                              style={{
-                                opacity: loadingResources.has(res.id) ? 0 : 1,
-                                transition: 'opacity 0.3s ease-in-out'
-                              }}
-                          />
-                          )}
+                          {(() => {
+                            const embeddedUrl = getEmbeddedUrl(res.url, isPdf);
+                            return (
+                              <div>
+                                <iframe
+                                  className="resource-frame"
+                                  src={embeddedUrl}
+                                  allow="autoplay"
+                                  title={res.title}
+                                  onLoad={() => setLoadingResources(prev => {
+                                    const newSet = new Set(prev);
+                                    newSet.delete(res.id);
+                                    return newSet;
+                                  })}
+                                  onError={(e) => {
+                                    // Fallback: Try direct iframe with original URL
+                                    const iframe = e.target as HTMLIFrameElement;
+                                    iframe.src = res.url;
+                                  }}
+                                  style={{
+                                    opacity: loadingResources.has(res.id) ? 0 : 1,
+                                    transition: 'opacity 0.3s ease-in-out'
+                                  }}
+                                />
+                              </div>
+                            );
+                          })()}
                         </div>
                       </>
                     )}
@@ -1523,16 +1626,42 @@ const ContentView: React.FC<ContentViewProps> = ({
                 <div className="content-add-section">
                   {!showContentAddForm.visible || showContentAddForm.section !== 'driveResources' ? (
                     <button
-                      className="content-add-btn"
+                      className={`content-add-btn ${addResourceStatus === 'success' ? 'success' : addResourceStatus === 'error' ? 'error' : ''}`}
                       onClick={() => {
                         setShowContentAddForm({ section: 'driveResources', visible: true });
                         setContentAddFormData({ contentType: 'drive', title: '', content: '', resourceType: 'ppt' });
+                        setAddResourceStatus('idle'); // Reset status when opening form
                       }}
+                      disabled={addResourceStatus === 'loading'}
                     >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M12 5v14M5 12h14"/>
-                      </svg>
-                      Add Resource
+                      {addResourceStatus === 'loading' && (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="loading-spinner">
+                          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" strokeDasharray="31.416" strokeDashoffset="31.416">
+                            <animate attributeName="stroke-dashoffset" values="31.416;0" dur="1s" repeatCount="indefinite"/>
+                          </circle>
+                        </svg>
+                      )}
+                      {addResourceStatus === 'success' && (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                      )}
+                      {addResourceStatus === 'error' && (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <circle cx="12" cy="12" r="10"/>
+                          <line x1="15" y1="9" x2="9" y2="15"/>
+                          <line x1="9" y1="9" x2="15" y2="15"/>
+                        </svg>
+                      )}
+                      {addResourceStatus === 'idle' && (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M12 5v14M5 12h14"/>
+                        </svg>
+                      )}
+                      {addResourceStatus === 'loading' ? 'Adding...' :
+                       addResourceStatus === 'success' ? 'Success!' :
+                       addResourceStatus === 'error' ? 'Try Again' :
+                       'Add Resource'}
                     </button>
                   ) : (
                     <div className="content-add-form">
@@ -1566,28 +1695,33 @@ const ContentView: React.FC<ContentViewProps> = ({
                       </div>
                       <div className="add-form-buttons">
                         <button
-                          className="add-form-submit"
-                          onClick={async () => {
-                            if (selectedSubtopic) {
-                              try {
-                                await createSubtopicContent(parseInt(selectedSubtopic.id), {
-                                  contentType: 'drive',
-                                  contentOrder: 1,
-                                  title: contentAddFormData.title,
-                                  content: contentAddFormData.content,
-                                  metadata: { resourceType: contentAddFormData.resourceType }
-                                });
-                                // Refresh content
-                                loadContentData();
-                                setShowContentAddForm({ section: '', visible: false });
-                              } catch (error) {
-                                console.error('Error adding content:', error);
-                              }
-                            }
-                          }}
-                          disabled={!contentAddFormData.title.trim() || !contentAddFormData.content.trim()}
+                          className={`add-form-submit ${addResourceStatus === 'success' ? 'success' : addResourceStatus === 'error' ? 'error' : ''}`}
+                          onClick={handleAddResource}
+                          disabled={!contentAddFormData.title.trim() || !contentAddFormData.content.trim() || addResourceStatus === 'loading'}
                         >
-                          Add
+                          {addResourceStatus === 'loading' && (
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="loading-spinner">
+                              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" strokeDasharray="31.416" strokeDashoffset="31.416">
+                                <animate attributeName="stroke-dashoffset" values="31.416;0" dur="1s" repeatCount="indefinite"/>
+                              </circle>
+                            </svg>
+                          )}
+                          {addResourceStatus === 'success' && (
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                          )}
+                          {addResourceStatus === 'error' && (
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <circle cx="12" cy="12" r="10"/>
+                              <line x1="15" y1="9" x2="9" y2="15"/>
+                              <line x1="9" y1="9" x2="15" y2="15"/>
+                            </svg>
+                          )}
+                          {addResourceStatus === 'loading' ? 'Adding...' :
+                           addResourceStatus === 'success' ? 'Added!' :
+                           addResourceStatus === 'error' ? 'Failed' :
+                           'Add'}
                         </button>
                         <button
                           className="add-form-cancel"
@@ -1776,7 +1910,7 @@ const ContentView: React.FC<ContentViewProps> = ({
             </div>
             <div className="questions-widget">
               <div className="qa-widget-list">
-                {contentData.questions.map((q: any, index: number) => (
+                {contentData.questions && Array.isArray(contentData.questions) && contentData.questions.map((q: any, index: number) => (
                   <div className="qa-widget-item" key={index}>
                     {isAdmin && (
                       <button
@@ -1909,13 +2043,22 @@ const ContentView: React.FC<ContentViewProps> = ({
   };
 
   // Render fullscreen resource if one is selected
+  // HARD GUARD: Prevent recursive ContentView rendering
   if (fullscreenResource) {
     const resources = contentData?.driveResources || [];
     const currentIndex = resources.findIndex((res: any) => res.id === fullscreenResource);
     const resource = resources[currentIndex];
+
+    // Safety check to prevent infinite recursion
+    if (!resource) {
+      console.error("Resource not found for fullscreen:", fullscreenResource);
+      return null;
+    }
     const hasMultipleResources = resources.length > 1;
-    const resourceType = resource?.metadata?.resourceType || 'ppt';
-    const isPdf = resourceType === 'pdf';
+    // FIX: PDF DETECTION - Infer from URL extension (most reliable)
+    // ❌ Don't rely on backend metadata that might be wrong
+    // ✅ Check if URL ends with .pdf
+    const isPdf = resource?.url?.toLowerCase().endsWith('.pdf') || false;
 
     const navigateToResource = (direction: 'prev' | 'next') => {
       if (!hasMultipleResources) return;
@@ -1981,39 +2124,33 @@ const ContentView: React.FC<ContentViewProps> = ({
                 <span className="resource-loading-text">Loading resource...</span>
               </div>
             )}
-            {isPdf ? (
-              <iframe
-                className="resource-fullscreen-iframe"
-                src={`https://docs.google.com/viewer?url=${encodeURIComponent(resource.url)}&embedded=true`}
-                allow="autoplay"
-                title={resource.title}
-                onLoad={() => setLoadingResources(prev => {
-                  const newSet = new Set(prev);
-                  newSet.delete(resource.id);
-                  return newSet;
-                })}
-                style={{
-                  opacity: loadingResources.has(resource.id) ? 0 : 1,
-                  transition: 'opacity 0.3s ease-in-out'
-                }}
-              />
-            ) : (
-            <iframe
-              className="resource-fullscreen-iframe"
-              src={resource.url}
-              allow="autoplay"
-              title={resource.title}
-                onLoad={() => setLoadingResources(prev => {
-                  const newSet = new Set(prev);
-                  newSet.delete(resource.id);
-                  return newSet;
-                })}
-                style={{
-                  opacity: loadingResources.has(resource.id) ? 0 : 1,
-                  transition: 'opacity 0.3s ease-in-out'
-                }}
-            />
-            )}
+            {(() => {
+              const embeddedUrl = getEmbeddedUrl(resource.url, isPdf);
+              return (
+                <div>
+                  <iframe
+                    className="resource-fullscreen-iframe"
+                    src={embeddedUrl}
+                    allow="autoplay"
+                    title={resource.title}
+                    onLoad={() => setLoadingResources(prev => {
+                      const newSet = new Set(prev);
+                      newSet.delete(resource.id);
+                      return newSet;
+                    })}
+                    onError={(e) => {
+                      // Fallback: Try direct iframe with original URL
+                      const iframe = e.target as HTMLIFrameElement;
+                      iframe.src = resource.url;
+                    }}
+                    style={{
+                      opacity: loadingResources.has(resource.id) ? 0 : 1,
+                      transition: 'opacity 0.3s ease-in-out'
+                    }}
+                  />
+                </div>
+              );
+            })()}
           </div>
         </div>
       );
@@ -2132,7 +2269,7 @@ const ContentView: React.FC<ContentViewProps> = ({
             </div>
           </div>
         )}
-        {contentData && sectionsOrder().map((section) => renderSection(section))}
+        {contentData && Array.isArray(sectionsOrder()) && sectionsOrder().map((section) => renderSection(section))}
 
         {/* Admin Panel - Only show for admin users */}
         {isAdmin && showAdminPanel && (
@@ -2181,7 +2318,7 @@ const ContentView: React.FC<ContentViewProps> = ({
                     onChange={(e) => setAdminFormData({...adminFormData, collegeId: e.target.value})}
                   >
                     <option value="">Select College</option>
-                    {adminColleges.map((college: any) => (
+                    {Array.isArray(adminColleges) && adminColleges.map((college: any) => (
                       <option key={college.id} value={college.id}>
                         {college.name}
                       </option>
@@ -2205,7 +2342,7 @@ const ContentView: React.FC<ContentViewProps> = ({
                     onChange={(e) => setAdminFormData({...adminFormData, collegeId: e.target.value, departmentId: ''})}
                   >
                     <option value="">Select College First</option>
-                    {adminColleges.map((college: any) => (
+                    {Array.isArray(adminColleges) && adminColleges.map((college: any) => (
                       <option key={college.id} value={college.id}>
                         {college.name}
                       </option>
@@ -2219,7 +2356,7 @@ const ContentView: React.FC<ContentViewProps> = ({
                     <option value="">
                       {adminFormData.collegeId ? 'Select Department' : 'Select College First'}
                     </option>
-                    {adminDepartments.map((department: any) => (
+                    {Array.isArray(adminDepartments) && adminDepartments.map((department: any) => (
                       <option key={department.id} value={department.id}>
                         {department.name}
                       </option>
@@ -2227,7 +2364,7 @@ const ContentView: React.FC<ContentViewProps> = ({
                   </select>
                   <input
                     type="text"
-                    placeholder="Semester Name (e.g., I, II, III)"
+                    placeholder="Semester Name (e.g SEMESTER 1)"
                     value={adminFormData.name}
                     onChange={(e) => setAdminFormData({...adminFormData, name: e.target.value})}
                   />
