@@ -240,7 +240,6 @@ const autoWrapBareMath = (text: string): string => {
     // Check if line contains ONLY math tokens (no English words)
     const hasLaTeXCommand = /\\[a-zA-Z]+/.test(trimmed);
     const hasMathSymbols = /[\^_\{\}\(\)=\+\-\*\/\s]/.test(trimmed);
-    const hasNumbers = /\d/.test(trimmed);
 
     // Must contain LaTeX commands AND no English words
     if (hasLaTeXCommand && hasMathSymbols && !/[a-zA-Z]{3,}/.test(trimmed.replace(/\\[a-zA-Z]+/g, ''))) {
@@ -291,7 +290,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
         components={{
           // Custom styling for code blocks
           code: ({ node, inline, className, children, ...props }: any) => {
-            const match = /language-(\w+)/.exec(className || '');
+            const match: RegExpExecArray | null = /language-(\w+)/.exec(className || '');
             return !inline && match ? (
               <pre className="markdown-code-block">
                 <code className={className} {...props}>
