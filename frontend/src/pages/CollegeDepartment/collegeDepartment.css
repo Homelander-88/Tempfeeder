@@ -340,6 +340,36 @@
     line-height: 1.6;
 }
 
+.error-text {
+    color: #ef4444;
+    font-size: 14px;
+    margin-top: 8px;
+}
+
+.retry-btn {
+    margin-top: 16px;
+    padding: 8px 16px;
+    background: var(--primary-accent);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.retry-btn:hover:not(:disabled) {
+    background: #1d4ed8;
+    transform: translateY(-1px);
+}
+
+.retry-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
 /* 10. Responsive */
 @media (max-width: 768px) {
     .back-button {

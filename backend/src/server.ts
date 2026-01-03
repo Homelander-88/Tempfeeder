@@ -5,263 +5,332 @@ import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
 import winston from "winston";
-import path from "path";
-import { fullRouter } from "./routes/index";
+import {fullRouter} from "./routes/index";
 
-/* =========================
-   Simple in-memory cache
-========================= */
-const cache = new Map<string, { data: any; timestamp: number }>();
+const app = express();
+
+// Simple in-memory cache for Vercel serverless optimization
+const cache = new Map();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
+// Cache middleware for GET requests
 const cacheMiddleware = (ttl: number = CACHE_TTL) => {
   return (req: express.Request, res: express.Response, next: express.NextFunction) => {
-    if (req.method !== "GET") return next();
+    if (req.method !== 'GET') return next();
 
     const key = req.originalUrl;
     const cached = cache.get(key);
 
-    if (cached && Date.now() - cached.timestamp < ttl) {
+    if (cached && (Date.now() - cached.timestamp) < ttl) {
       return res.json(cached.data);
     }
 
-    const originalJson = res.json.bind(res);
-    res.json = (data: any) => {
+    // Store original json method
+    const originalJson = res.json;
+    res.json = function(data) {
       cache.set(key, { data, timestamp: Date.now() });
-      return originalJson(data);
+      return originalJson.call(this, data);
     };
 
     next();
   };
 };
 
-/* =========================
-   Winston Logger (Render-safe)
-========================= */
-const transports: winston.transport[] = [];
-
-// Always log to console (Render / Docker / serverless)
-transports.push(
-  new winston.transports.Console({
-    format: winston.format.combine(
-      winston.format.colorize(),
-      winston.format.simple()
-    ),
-  })
-);
-
-// File logging ONLY in local development
-if (process.env.NODE_ENV === "development") {
-  transports.push(
-    new winston.transports.File({
-      filename: path.join("logs", "error.log"),
-      level: "error",
-    }),
-    new winston.transports.File({
-      filename: path.join("logs", "combined.log"),
-    })
-  );
-}
-
+// Logger configuration - optimized for Vercel serverless
+// Vercel doesn't support file-based logging, so we use console only
 const logger = winston.createLogger({
-  level: "info",
+  level: 'info',
   format: winston.format.combine(
     winston.format.timestamp(),
     winston.format.errors({ stack: true }),
     winston.format.json()
   ),
-  defaultMeta: { service: "spoonfeeder-backend" },
-  transports,
+  defaultMeta: { service: 'spoonfeeder-backend' },
+  transports: [
+    // Always use console for Vercel (file logging doesn't work in serverless)
+    new winston.transports.Console({
+      format: winston.format.combine(
+        winston.format.colorize(),
+        winston.format.simple()
+      )
+    })
+  ],
 });
 
-/* =========================
-   Express App
-========================= */
-const app = express();
-const PORT = process.env.PORT || 5000;
+// Vercel automatically assigns PORT, but we need a default for local development
+const PORT = process.env.VERCEL ? undefined : parseInt(process.env.PORT || "5000", 10);
 
-/* =========================
-   Database check
-========================= */
-async function testConnection() {
-  try {
-    const result = await pool.query("SELECT NOW()");
-    logger.info("Connected to PostgreSQL", {
-      databaseTime: result.rows[0].now,
-    });
-    return true;
-  } catch (err) {
-    logger.error("Database connection failed", { error: err });
-    throw err;
-  }
+async function testConnection(retries: number = 3, delay: number = 2000){
+    for (let i = 0; i < retries; i++) {
+        try{
+            const result = await pool.query("SELECT NOW()");
+            logger.info("Connected to PostgreSQL database", {
+                databaseTime: result.rows[0].now,
+                attempt: i + 1
+            });
+            return true;
+        }catch(err){
+            if (i === retries - 1) {
+                // Last attempt failed
+                logger.error("Database connection failed after all retries", {
+                    error: err,
+                    attempts: retries
+                });
+                throw err;
+            }
+            logger.warn(`Database connection attempt ${i + 1} failed, retrying in ${delay}ms...`, {
+                error: err instanceof Error ? err.message : String(err)
+            });
+            await new Promise(resolve => setTimeout(resolve, delay));
+        }
+    }
+    return false;
 }
 
-/* =========================
-   Process-level safety
-========================= */
-process.on("unhandledRejection", (reason: any) => {
-  logger.error("Unhandled Rejection", { reason });
+// Handle unhandled promise rejections (critical for async route handlers)
+process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
+    logger.error('Unhandled Rejection at:', { promise, reason });
+    // Don't exit in production, but log it
+    if (process.env.NODE_ENV === 'development') {
+        console.error('Unhandled Rejection:', reason);
+    }
 });
 
-process.on("uncaughtException", (error: Error) => {
-  logger.error("Uncaught Exception", {
-    message: error.message,
-    stack: error.stack,
-  });
-  process.exit(1);
+// Handle uncaught exceptions
+process.on('uncaughtException', (error: Error) => {
+    logger.error('Uncaught Exception:', { error: error.message, stack: error.stack });
+    // Exit on uncaught exception (server is in unknown state)
+    process.exit(1);
 });
-
-/* =========================
-   Security & performance
-========================= */
-app.use(
-  helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
-        scriptSrc: ["'self'"],
-        imgSrc: ["'self'", "data:", "https:"],
-      },
+// Security middleware
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
     },
-  })
-);
+  },
+}));
 
+
+// Compression
 app.use(compression());
 
-/* =========================
-   Slow request logging
-========================= */
-app.use((req, res, next) => {
+// Response time monitoring
+app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
   const start = Date.now();
-  res.on("finish", () => {
+  res.on('finish', () => {
     const duration = Date.now() - start;
-    if (duration > 1000) {
-      logger.warn("Slow request", {
+    if (duration > 1000) { // Log slow requests (>1s)
+      logger.warn('Slow request detected', {
         method: req.method,
         url: req.url,
         duration: `${duration}ms`,
-        status: res.statusCode,
+        statusCode: res.statusCode
       });
     }
   });
   next();
 });
 
-/* =========================
-   Hard request timeout
-========================= */
-app.use((req, res, next) => {
-  const TIMEOUT_MS = 25_000;
+// Hard request timeout safety net - prevents infinite hanging requests
+// Vercel has different timeouts: 10s (Hobby), 60s (Pro), 900s (Enterprise)
+// Using 50s as a safe default (works for Pro tier, fails fast on Hobby)
+const TIMEOUT_MS = process.env.VERCEL ? 50000 : 25000; // 50s for Vercel, 25s for local development
+app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
   const timer = setTimeout(() => {
     if (!res.headersSent) {
-      logger.warn("Request timeout", {
+      logger.warn('Request timeout - forcing response', {
         method: req.method,
         url: req.url,
+        timeout: `${TIMEOUT_MS}ms`
       });
-      res.status(504).json({ error: "Request timeout" });
+      res.status(504).json({ error: 'Request timeout' });
     }
   }, TIMEOUT_MS);
 
-  res.on("finish", () => clearTimeout(timer));
-  res.on("close", () => clearTimeout(timer));
+  // Clear timeout when response finishes (success or error)
+  res.on('finish', () => clearTimeout(timer));
+  res.on('close', () => clearTimeout(timer)); // Also clear on connection close
+
   next();
 });
 
-/* =========================
-   CORS
-========================= */
-app.use(
-  cors({
-    origin(origin, callback) {
-      if (!origin) return callback(null, true);
-      if (origin.startsWith("http://localhost:")) return callback(null, true);
-      if (process.env.NODE_ENV !== "production") return callback(null, true);
+// CORS configuration - Allow all localhost ports and production domains
+const corsOptions = {
+  origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
 
-      const allowed = [
-        "https://spoonfeeders.vercel.app",
-        "https://spoonfeeder-three.vercel.app",
-        "https://tempfeeder.vercel.app",
-        process.env.FRONTEND_URL,
-      ].filter(Boolean);
+    const allowedOrigins = [
+      'http://localhost:5173', // Vite dev server
+      'http://localhost:3000', // React dev server
+      'http://localhost:3001', // Alternative port
+      'http://localhost:3002', // Alternative port
+      'http://localhost:8080', // Another common dev port
+      'https://spoonfeeders.vercel.app', // Production Vercel frontend
+      'https://spoonfeederz.vercel.app', // Vercel backend (for API calls)
+      process.env.FRONTEND_URL // Environment variable
+    ].filter(Boolean); // Remove undefined values
 
-      return allowed.includes(origin)
-        ? callback(null, true)
-        : callback(new Error("Not allowed by CORS"));
-    },
-    credentials: true,
-  })
-);
+    // Allow localhost origins (for development)
+    if (origin.startsWith('http://localhost:')) {
+      return callback(null, true);
+    }
 
-/* =========================
-   Body parsing
-========================= */
-app.use(express.json({ limit: "5mb" }));
-app.use(express.urlencoded({ extended: true, limit: "5mb" }));
+    // Check if origin is in allowed list
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
 
-/* =========================
-   Cached routes
-========================= */
-app.use("/api/health", cacheMiddleware(30_000));
-app.use("/api/colleges", cacheMiddleware());
-app.use("/api/departments", cacheMiddleware());
-app.use("/api/semesters", cacheMiddleware());
+    // In development, allow all origins
+    if (process.env.NODE_ENV !== 'production') {
+      return callback(null, true);
+    }
+
+    // Reject in production
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+  optionsSuccessStatus: 200,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+};
+
+app.use(cors(corsOptions));
+
+// Body parsing with optimized settings
+app.use(express.json({
+    limit: '5mb', // Reduced from 10mb for better performance
+    strict: true
+}));
+app.use(express.urlencoded({
+    extended: true,
+    limit: '5mb'
+})); // Limit payload size
+
+
+// Apply caching to read-heavy endpoints (not auth)
+app.use('/api/health', cacheMiddleware(30000)); // Cache health check for 30 seconds
+app.use('/api/colleges', cacheMiddleware());
+app.use('/api/departments', cacheMiddleware());
+app.use('/api/semesters', cacheMiddleware());
 
 app.use("/api", fullRouter);
 
-/* =========================
-   Errors & 404
-========================= */
-app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  logger.error("Unhandled error", {
-    message: err.message,
+// Global error handler
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  logger.error('Unhandled error', {
+    error: err.message,
     stack: err.stack,
     url: req.url,
+    method: req.method,
+    ip: req.ip
   });
-  res.status(500).json({ error: "Internal server error" });
+
+  res.status(500).json({
+    error: process.env.NODE_ENV === 'production'
+      ? 'Internal server error'
+      : err.message
+  });
 });
 
-app.use((req, res) => {
-  logger.warn("404 Not Found", { url: req.url });
-  res.status(404).json({ error: "Route not found" });
+// 404 handler
+app.use((req: express.Request, res: express.Response) => {
+  logger.warn('404 - Route not found', {
+    url: req.url,
+    method: req.method,
+    ip: req.ip
+  });
+  res.status(404).json({ error: 'Route not found' });
 });
 
-/* =========================
-   Graceful shutdown
-========================= */
-const shutdown = () => {
-  logger.info("Shutting down gracefully");
-  pool.end(() => process.exit(0));
-};
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  logger.info('SIGTERM received, shutting down gracefully');
+  pool.end(() => {
+    logger.info('Database connection closed');
+    process.exit(0);
+  });
+});
 
-process.on("SIGTERM", shutdown);
-process.on("SIGINT", shutdown);
+process.on('SIGINT', () => {
+  logger.info('SIGINT received, shutting down gracefully');
+  pool.end(() => {
+    logger.info('Database connection closed');
+    process.exit(0);
+  });
+});
 
-/* =========================
-   Start server
-========================= */
+// Start server only after database connection is ready
 async function startServer() {
-  try {
-    await testConnection();
+    try {
+        // Wait for database connection before starting server
+        await testConnection();
 
-    const server = app.listen(PORT, () => {
-      logger.info("Server started", {
-        port: PORT,
-        env: process.env.NODE_ENV || "development",
-        node: process.version,
-      });
-    });
+        // Only start server if not on Vercel (Vercel handles server lifecycle)
+        if (!process.env.VERCEL && PORT) {
+            const server = app.listen(PORT, "0.0.0.0", () => {
+                logger.info(`Server is running on port ${PORT}`, {
+                    port: PORT,
+                    host: "0.0.0.0",
+                    environment: process.env.NODE_ENV || 'development',
+                    nodeVersion: process.version,
+                    memoryLimit: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + 'MB',
+                    platform: process.platform
+                });
+            });
 
-    if (process.env.RENDER || process.env.NODE_ENV === "production") {
-      server.keepAliveTimeout = 75_000;
-      server.headersTimeout = 76_000;
-      server.timeout = 25_000;
-      server.maxConnections = 25;
+            // Local development optimizations
+            server.keepAliveTimeout = 65000;
+            server.headersTimeout = 66000;
+            server.timeout = 25000;
+
+            // Handle server startup errors
+            server.on('error', (error: any) => {
+                if (error.code === 'EADDRINUSE') {
+                    logger.error(`Port ${PORT} is already in use`, { error: error.message });
+                } else {
+                    logger.error('Server startup error', { error: error.message });
+                }
+                process.exit(1);
+            });
+
+            // Clean up cache periodically to prevent memory bloat
+            setInterval(() => {
+                const now = Date.now();
+                for (const [key, value] of cache.entries()) {
+                    if (now - value.timestamp > CACHE_TTL) {
+                        cache.delete(key);
+                    }
+                }
+            }, 300000); // Every 5 minutes
+        } else {
+            logger.info('Running on Vercel - serverless mode', {
+                environment: process.env.NODE_ENV || 'development',
+                nodeVersion: process.version
+            });
+        }
+    } catch (error) {
+        logger.error('Failed to start server - database connection failed', { error });
+        process.exit(1);
     }
-  } catch (err) {
-    logger.error("Startup failed", { err });
-    process.exit(1);
-  }
 }
 
-startServer();
+// Initialize database connection
+if (process.env.VERCEL) {
+    // For Vercel serverless: test connection once when function container initializes
+    // This helps catch connection issues early without blocking requests
+    testConnection().catch((err) => {
+        logger.error('Database connection test failed on Vercel initialization', { error: err });
+        // Don't exit - let individual requests handle connection errors
+    });
+} else {
+    // Traditional server startup for development/local
+    startServer();
+}
+
+// Always export the app (ES modules) - Vercel handles server lifecycle
+export default app;

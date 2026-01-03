@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import type { JSX } from "react";
 import Header from "../../components/Header/Header";
 import Sidebar from "../../components/Sidebar/Sidebar";
@@ -11,6 +11,27 @@ import { createCourse, deleteCourse } from "../../api/courses";
 import { createTopic, deleteTopic } from "../../api/topics";
 import { createSubtopic, deleteSubtopic, createSubtopicContent, getSubtopicContent, deleteSubtopicContent } from "../../api/subtopics";
 import "./ContentView.css";
+import { processMathExpressions, isStandaloneMathLine } from "../../utils/mathProcessor";
+import { convertLatexToUnicode } from "../../utils/latexToUnicode";
+import { MarkdownRenderer } from "../../components/MarkdownRenderer/MarkdownRenderer";
+
+// Initialize MathJax
+declare global {
+  interface Window {
+    MathJax?: {
+      typesetPromise: (elements?: HTMLElement[]) => Promise<void>;
+      startup: {
+        ready: () => void;
+      };
+      config: {
+        tex: {
+          inlineMath: string[][];
+          displayMath: string[][];
+        };
+      };
+    };
+  }
+}
 
 
 interface ContentViewProps {
@@ -65,17 +86,68 @@ const ContentView: React.FC<ContentViewProps> = ({
       console.warn('Error saving mode to localStorage:', error);
     }
   }, [mode]);
+
+  // Initialize MathJax
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = 'https://polyfill.io/v3/polyfill.min.js?features=es6';
+    script.async = true;
+    document.head.appendChild(script);
+
+    const mathJaxScript = document.createElement('script');
+    mathJaxScript.id = 'MathJax-script';
+    mathJaxScript.src = 'https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js';
+    mathJaxScript.async = true;
+    mathJaxScript.onload = () => {
+      if (window.MathJax) {
+        (window.MathJax.config as any) = {
+          tex: {
+            inlineMath: [['\\(', '\\)'], ['$', '$']],
+            displayMath: [['\\[', '\\]'], ['$$', '$$']],
+            processEscapes: true,
+            processEnvironments: true
+          }
+        };
+        window.MathJax.startup.ready();
+      }
+    };
+    document.head.appendChild(mathJaxScript);
+
+    return () => {
+      // Cleanup
+      const existingScript = document.getElementById('MathJax-script');
+      if (existingScript) {
+        existingScript.remove();
+      }
+    };
+  }, []);
   const { selectedSubtopic, hierarchy, selectedCourse, selectedTopic, courses, topics, subtopics, setSelectedCourse, setSelectedTopic, setSelectedSubtopic, loadTopics, loadSubtopics, loadContent, loadCourses, setHierarchy, clearTopicCache, clearSubtopicCache } = useHierarchy();
 
-  // Debug logging for topics state
-  console.log('ContentView render - topics:', topics, 'selectedCourse:', selectedCourse);
+  // Debug logging for topics state (only in development)
+  if (import.meta.env.DEV) {
+    console.log('ContentView render - topics:', topics, 'selectedCourse:', selectedCourse);
+  }
 
-  // Debug when topics change
+  // Debug when topics change (only in development)
   useEffect(() => {
-    console.log('ContentView - topics changed:', topics);
+    if (import.meta.env.DEV) {
+      console.log('ContentView - topics changed:', topics);
+    }
   }, [topics]);
   const { isAdmin } = useAuth();
   const [contentData, setContentData] = useState<any>(null);
+
+  // Re-render MathJax when content changes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (window.MathJax) {
+        window.MathJax.typesetPromise().catch((err: Error) => {
+          console.warn('MathJax typeset error:', err);
+        });
+      }
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [contentData]);
   const [isLoadingCourses, setIsLoadingCourses] = useState(false);
   const [isLoadingTopics, setIsLoadingTopics] = useState(false);
   const [isLoadingSubtopics, setIsLoadingSubtopics] = useState(false);
@@ -96,8 +168,10 @@ const ContentView: React.FC<ContentViewProps> = ({
     contentType: 'notes',
     title: '',
     content: '',
-    resourceType: 'ppt' // 'pdf' or 'ppt'
+    resourceType: 'ppt', // 'pdf' or 'ppt'
+    contentFormat: 'normal' // 'normal', 'math', or 'code'
   });
+  const [addResourceStatus, setAddResourceStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [adminFormData, setAdminFormData] = useState({
     name: '',
     collegeId: '',
@@ -154,6 +228,46 @@ const ContentView: React.FC<ContentViewProps> = ({
       setShowAddForm({ mode: '', visible: false });
     } catch (error) {
       console.error('Error adding item:', error);
+    }
+  };
+
+  const handleAddResource = async () => {
+    if (!selectedSubtopic || !contentAddFormData.title.trim() || !contentAddFormData.content.trim()) {
+      return;
+    }
+
+    setAddResourceStatus('loading');
+
+    try {
+      await createSubtopicContent(parseInt(selectedSubtopic.id), {
+        contentType: 'drive',
+        contentOrder: 1,
+        title: contentAddFormData.title,
+        content: contentAddFormData.content,
+        metadata: { resourceType: contentAddFormData.resourceType }
+      });
+
+      setAddResourceStatus('success');
+
+      // Refresh content
+      loadContentData();
+      setShowContentAddForm({ section: '', visible: false });
+
+      // Reset status after showing success for a moment
+      setTimeout(() => {
+        setAddResourceStatus('idle');
+        // Clear form data
+        setContentAddFormData({ contentType: 'drive', title: '', content: '', resourceType: 'ppt', contentFormat: 'normal' });
+      }, 1500);
+
+    } catch (error) {
+      console.error('Error adding resource:', error);
+      setAddResourceStatus('error');
+
+      // Reset status after showing error for a moment
+      setTimeout(() => {
+        setAddResourceStatus('idle');
+      }, 3000);
     }
   };
 
@@ -221,30 +335,32 @@ const ContentView: React.FC<ContentViewProps> = ({
   };
 
   
-  // Session-level content cache using sessionStorage
-  const getContentFromCache = (subtopicId: string): any | null => {
+  // Session-level content cache using sessionStorage - memoized to prevent recreation
+  const getContentFromCache = useCallback((subtopicId: string): any | null => {
     try {
       const cacheKey = `content_cache_${subtopicId}`;
       const cached = sessionStorage.getItem(cacheKey);
       return cached ? JSON.parse(cached) : null;
     } catch (error) {
-      console.error('Error reading from cache:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error reading from cache:', error);
+      }
       return null;
     }
-  };
+  }, []);
 
-  const setContentInCache = (subtopicId: string, content: any) => {
+  const setContentInCache = useCallback((subtopicId: string, content: any) => {
     try {
       const cacheKey = `content_cache_${subtopicId}`;
       sessionStorage.setItem(cacheKey, JSON.stringify(content));
     } catch (error) {
-      console.error('Error writing to cache:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error writing to cache:', error);
+      }
     }
-  };
+  }, []);
 
   const notesRef = useRef<HTMLDivElement>(null);
-  const [showToolbar, setShowToolbar] = useState(false);
-  const [toolbarPos, setToolbarPos] = useState({ x: 0, y: 0 });
 
   // Ensure hierarchy is loaded from localStorage if context doesn't have it
   useEffect(() => {
@@ -335,7 +451,16 @@ const ContentView: React.FC<ContentViewProps> = ({
       // Check sessionStorage cache first (only for non-admin users)
       const cachedContent = getContentFromCache(subtopicId);
       if (cachedContent) {
-        setContentData(cachedContent);
+        // Ensure cached content has all required array properties
+        const safeCachedContent = {
+          ...cachedContent,
+          videos: Array.isArray(cachedContent.videos) ? cachedContent.videos : [],
+          driveResources: Array.isArray(cachedContent.driveResources) ? cachedContent.driveResources : [],
+          notesItems: Array.isArray(cachedContent.notesItems) ? cachedContent.notesItems : [],
+          questions: Array.isArray(cachedContent.questions) ? cachedContent.questions : [],
+          notes: cachedContent.notes || ''
+        };
+        setContentData(safeCachedContent);
         setIsLoadingContent(false);
         // Don't auto-load sections - let them load progressively when viewed
         return;
@@ -368,6 +493,7 @@ const ContentView: React.FC<ContentViewProps> = ({
           videos: [],
           driveResources: [],
           notes: "",
+          notesItems: [],
           questions: []
         };
         setContentData(emptyContent);
@@ -383,6 +509,7 @@ const ContentView: React.FC<ContentViewProps> = ({
         videos: [],
         driveResources: [],
         notes: "",
+        notesItems: [],
         questions: []
       };
       setContentData(emptyContent);
@@ -405,6 +532,19 @@ const ContentView: React.FC<ContentViewProps> = ({
       notes: [],
       questions: []
     };
+
+    // Safety check: ensure backendContent is an array
+    if (!Array.isArray(backendContent)) {
+      return {
+        title: selectedSubtopic?.name || 'Content',
+        videos: [],
+        featuredVideo: null,
+        driveResources: [],
+        notes: '',
+        notesItems: [],
+        questions: []
+      };
+    }
 
     backendContent.forEach(item => {
       // Handle both content_type and contentType (backend may use either)
@@ -560,33 +700,16 @@ const ContentView: React.FC<ContentViewProps> = ({
           document.activeElement.blur();
         }
 
-        // If highlight toolbar is visible, undo the last highlight instead of toggling sidebar
-        if (showToolbar) {
-          undoLastHighlight();
-        } else {
-          setSidebarCollapsed(!sidebarCollapsed);
-        }
+        // Toggle sidebar
+        setSidebarCollapsed(!sidebarCollapsed);
       }
     };
 
     // Use document event listener with capture to work even when focused in iframes
     document.addEventListener('keydown', handleKeyDown, { capture: true });
     return () => document.removeEventListener('keydown', handleKeyDown, { capture: true });
-  }, [sidebarCollapsed, showToolbar]);
+  }, [sidebarCollapsed]);
 
-  // Undo last highlight functionality
-  const undoLastHighlight = () => {
-    const highlights = document.querySelectorAll('.user-highlight');
-    if (highlights.length > 0) {
-      const lastHighlight = highlights[highlights.length - 1] as HTMLElement;
-      const parent = lastHighlight.parentNode!;
-      while (lastHighlight.firstChild) {
-        parent.insertBefore(lastHighlight.firstChild, lastHighlight);
-      }
-      parent.removeChild(lastHighlight);
-      setShowToolbar(false);
-    }
-  };
 
   const handleNavigate = (path: string) => {
     if (path === "/login") onNavigateToLogin();
@@ -643,6 +766,42 @@ const ContentView: React.FC<ContentViewProps> = ({
     return match ? match[1] : "";
   };
 
+  const getEmbeddedUrl = (url: string, isPdf: boolean) => {
+    if (isPdf) {
+      // Extract filename from URL (handle both full URLs and just filenames)
+      let filename: string;
+      if (url.startsWith("http")) {
+        // Extract filename from full URL
+        const urlParts = url.split('/');
+        filename = urlParts[urlParts.length - 1].split('?')[0]; // Remove query params if any
+      } else {
+        // Already just a filename
+        filename = url;
+      }
+
+      // Build Cloudflare Worker URL with filename as route
+      const workerBaseUrl = 'https://pdf-storage.suganthr09.workers.dev';
+      const workerUrl = `${workerBaseUrl}/${filename}`;
+
+      if (import.meta.env.DEV) {
+        console.log('🔗 PDF URL - Original:', url);
+        console.log('🔗 PDF URL - Filename:', filename);
+        console.log('🔗 PDF URL - Worker URL:', workerUrl);
+      }
+
+      // Direct embed of Cloudflare Worker URL (no PDF.js viewer)
+      return workerUrl;
+    } else {
+      // For PPTs and other files: Use Google Docs viewer with preview URL
+      // Extract file ID from Google Drive sharing URL
+      const fileIdMatch = url.match(/\/file\/d\/([a-zA-Z0-9-_]+)/);
+      if (!fileIdMatch) return url;
+
+      const fileId = fileIdMatch[1];
+      return `https://docs.google.com/viewer?url=${encodeURIComponent(`https://drive.google.com/uc?id=${fileId}`)}&embedded=true`;
+    }
+  };
+
   const getYoutubeThumbnail = (url: string, qualityIndex: number = 0) => {
     const videoId = getYoutubeId(url);
     if (!videoId) return "";
@@ -663,30 +822,17 @@ const ContentView: React.FC<ContentViewProps> = ({
     setLoadingVideos(prev => new Set(prev).add(id));
   };
 
-  // Parse and render structured text with visual elements for hierarchy
-  const parseStructuredText = (text: string, enableCodeDetection: boolean = false) => {
+  // NOTE: parseStructuredText function is deprecated - now using MarkdownRenderer for automatic Markdown + LaTeX rendering
+  // Keeping the function for parseInlineFormatting which is still used for question rendering
+  // @ts-ignore - Function kept for parseInlineFormatting compatibility
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const parseStructuredText = (text: string, contentFormat: string = 'normal') => {
     if (!text || text.trim() === '') {
       return [<p key="empty" className="structured-paragraph">No content available</p>];
     }
 
-
-    // If code detection is enabled, check if entire text should be treated as code
-    if (enableCodeDetection) {
-      const hasCodeContent = text.split('\n').some(line => {
-        const trimmed = line.trim();
-        // Function definitions
-        if (trimmed.match(/^(function|def|class|public|private|void|int|string|bool|const|let|var)\s+\w+/)) return true;
-        // Algorithm/pseudocode patterns
-        if (trimmed.match(/^(if|for|while|do|BEGIN|END|READ|FOR|WHILE|IF|ELSE|RETURN)\s|\w+\([^)]*\)\s*[:{]|\w+\s*\([^)]*\)\s*{/)) return true;
-        // Array access patterns
-        if (trimmed.match(/[A-Z]\[[^\]]+\]/)) return true;
-        // Assignment with code-like syntax
-        if (trimmed.match(/^\w+\s*=\s*[^=]/) && (trimmed.includes('[') || trimmed.includes('(') || trimmed.includes('{'))) return true;
-        return false;
-      });
-
-      // If text contains code patterns, render entire text as one code block
-      if (hasCodeContent) {
+    // If format is 'code', render entire text as code block
+    if (contentFormat === 'code') {
         return [
           <pre
             key="full-code-block"
@@ -698,7 +844,6 @@ const ContentView: React.FC<ContentViewProps> = ({
             </code>
           </pre>
         ];
-      }
     }
 
     // Content parsing for regular text sections
@@ -771,6 +916,11 @@ const ContentView: React.FC<ContentViewProps> = ({
     lines.forEach((line, index) => {
       const trimmedLine = line.trim();
       const leadingSpaces = line.length - line.trimLeft().length;
+
+      // Skip standalone square brackets (just [ or ] on their own line)
+      if (trimmedLine === '[' || trimmedLine === ']') {
+        return; // Skip this line
+      }
 
 
 
@@ -953,11 +1103,88 @@ const ContentView: React.FC<ContentViewProps> = ({
         return;
       }
 
+      // Block math detection ($$...$$ or \[...\]) - only if format is 'math'
+      if (contentFormat === 'math') {
+        const blockMathMatch = trimmedLine.match(/^\$\$([^$]+)\$\$$/) || trimmedLine.match(/^\\\[([^\]]+)\\\]$/);
+        if (blockMathMatch) {
+          flushList();
+          flushTable();
+          const mathContent = blockMathMatch[1].trim();
+          elements.push(
+            <div key={`math-${index}`} className="math-block" style={{ margin: '1em 0', textAlign: 'center' }}>
+              <span className="math-display">$${mathContent}$$</span>
+            </div>
+          );
+          return;
+        }
+      }
+
+      // Check if line is a standalone math expression (possibly in square brackets)
+      if (isStandaloneMathLine(trimmedLine)) {
+        flushList();
+        flushTable();
+        
+        if (contentFormat === 'math') {
+          // For math format: use MathJax
+          let processedLine = processMathExpressions(trimmedLine, true, false);
+          
+          // Ensure it's in block math format
+          if (!processedLine.trim().startsWith('$$')) {
+            const mathMatch = processedLine.match(/\$\$([^$]+)\$\$/) || processedLine.match(/\\\(([^\)]+)\\\)/);
+            if (mathMatch) {
+              processedLine = `$$${mathMatch[1].trim()}$$`;
+            } else {
+              processedLine = `$$${processedLine.trim()}$$`;
+            }
+          }
+          
+          const mathContentMatch = processedLine.match(/\$\$([^$]+)\$\$/);
+          const mathContent = mathContentMatch ? mathContentMatch[1].trim() : processedLine.replace(/\$\$/g, '').trim();
+          
+          elements.push(
+            <div key={`math-block-${index}`} className="math-block" style={{ margin: '1em 0', textAlign: 'center' }}>
+              <span className="math-display">$${mathContent}$$</span>
+            </div>
+          );
+        } else {
+          // For normal format: remove brackets, convert LaTeX to Unicode, display as centered text
+          let processedLine = trimmedLine;
+          // Remove square brackets
+          processedLine = processedLine.replace(/\[([^\]]+)\]/g, (match, content) => {
+            const trimmed = content.trim();
+            // Check if it's a link
+            const matchIndex = processedLine.indexOf(match);
+            const afterMatch = processedLine.substring(matchIndex + match.length);
+            if (/^\s*\(/.test(afterMatch)) return match; // Keep links
+            // Remove brackets from math-like content
+            if (/[≥≤∈∉∑∏∫√\d\s=<>\\\^_\{\}\(\)]/.test(trimmed) && trimmed.length > 2) {
+              return trimmed;
+            }
+            return match;
+          });
+          // Convert LaTeX to Unicode
+          processedLine = convertLatexToUnicode(processedLine);
+          
+          elements.push(
+            <div key={`math-block-${index}`} className="math-block" style={{ margin: '1em 0', textAlign: 'center', fontFamily: 'monospace' }}>
+              {processedLine}
+            </div>
+          );
+        }
+        return;
+      }
+
       // Regular paragraphs
       flushList();
+      // Process based on format
+      let processedLine = trimmedLine;
+      if (contentFormat === 'math') {
+        processedLine = processMathExpressions(trimmedLine, true, false);
+      }
+      // For normal format, conversion happens in parseInlineFormatting
       elements.push(
         <p key={index} className="structured-paragraph">
-          {parseInlineFormatting(trimmedLine)}
+          {parseInlineFormatting(processedLine, contentFormat === 'math', contentFormat === 'normal')}
         </p>
       );
     });
@@ -974,42 +1201,55 @@ const ContentView: React.FC<ContentViewProps> = ({
   };
 
   // Parse inline formatting like **bold** and *italic* with robust code preservation
-  const parseInlineFormatting = (text: string, preserveCode: boolean = false) => {
+
+  const parseInlineFormatting = (text: string, enableMath: boolean = false, convertToUnicode: boolean = false) => {
     if (!text) return text;
 
     let formattedText = text;
 
-    // For code preservation, skip HTML escaping to maintain exact code structure
-    if (!preserveCode) {
-      // Escape HTML entities first to prevent XSS (but preserve code)
+    // Convert LaTeX to Unicode if requested (for normal format)
+    if (convertToUnicode) {
+      formattedText = convertLatexToUnicode(formattedText);
+      // Also remove square brackets from math-like content
+      formattedText = formattedText.replace(/\[([^\]]+)\]/g, (match, content) => {
+        const trimmed = content.trim();
+        // Check if it's a link
+        const matchIndex = formattedText.indexOf(match);
+        const afterMatch = formattedText.substring(matchIndex + match.length);
+        if (/^\s*\(/.test(afterMatch)) return match; // Keep links
+        // Remove brackets from math-like content
+        if (/[≥≤∈∉∑∏∫√\d\s=<>]/.test(trimmed) && trimmed.length > 2) {
+          return trimmed; // Remove brackets
+        }
+        return match;
+      });
+    }
+
+    // Process math expressions first (before HTML escaping) - only if math is enabled
+    if (enableMath) {
+      formattedText = processMathExpressions(formattedText, true, false);
+    }
+
+    // Escape HTML entities first to prevent XSS
       formattedText = formattedText
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
-    }
 
-    // Links [text](url) - only process if not preserving code
-    if (!preserveCode) {
+    // Links [text](url) - Process before other formatting to avoid conflicts
       formattedText = formattedText.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="structured-link" target="_blank" rel="noopener noreferrer">$1</a>');
-    }
 
-    // Strikethrough (~~text~~) - only process if not preserving code
-    if (!preserveCode) {
+    // Strikethrough (~~text~~)
       formattedText = formattedText.replace(/~~(.*?)~~/g, '<span class="structured-strikethrough">$1</span>');
-    }
 
-    // Bold text (**text**) - handle multiline and nested, but skip in code
-    if (!preserveCode) {
+    // Bold text (**text**)
       formattedText = formattedText.replace(/\*\*(.*?)\*\*/g, '<span class="structured-bold">$1</span>');
-    }
 
-    // Italic text (*text* or _text_) - but avoid matching **bold** patterns, skip in code
-    if (!preserveCode) {
+    // Italic text (*text* or _text_) - but avoid matching **bold** patterns
       formattedText = formattedText.replace(/(?<!\*)\*(?!\*)([^*]+?)(?<!\*)\*(?!\*)/g, '<span class="structured-italic">$1</span>');
       formattedText = formattedText.replace(/(?<!_)_([^_]+?)_(?!_)/g, '<span class="structured-italic">$1</span>');
-    }
 
     // Inline code (`code`) - preserve code exactly
     formattedText = formattedText.replace(/`([^`\n]+)`/g, (_match, code) => {
@@ -1023,54 +1263,25 @@ const ContentView: React.FC<ContentViewProps> = ({
       return `<code class="structured-inline-code">${escapedCode}</code>`;
     });
 
-    // Handle line breaks within paragraphs - only if not preserving code
-    if (!preserveCode) {
+    // Handle line breaks within paragraphs
       formattedText = formattedText.replace(/\n/g, '<br>');
-    }
 
     // Return as dangerouslySetInnerHTML to render HTML
     return <span dangerouslySetInnerHTML={{ __html: formattedText }} />;
   };
 
-  // Render notes with structured parsing
-  const renderMarkdown = (text: string) => {
+  // Render notes with MarkdownRenderer (automatic Markdown + LaTeX rendering)
+  const renderMarkdown = (text: string, _format: string = 'normal') => {
+    if (!text || text.trim() === '') {
+      return <div className="notes-structured">No content available</div>;
+    }
     return (
       <div className="notes-structured">
-        {parseStructuredText(text)}
+        <MarkdownRenderer content={text} />
       </div>
     );
   };
 
-  const handleSelection = () => {
-    const selection = window.getSelection();
-    if (!selection || selection.toString().trim() === "") { setShowToolbar(false); return; }
-    const range = selection.getRangeAt(0);
-    if (notesRef.current && !notesRef.current.contains(range.commonAncestorContainer)) { setShowToolbar(false); return; }
-    const rect = range.getBoundingClientRect();
-    setToolbarPos({ x: rect.left + rect.width / 2, y: rect.top - 40 });
-    setShowToolbar(true);
-  };
-
-  const applyHighlight = () => {
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0) return;
-    const range = selection.getRangeAt(0);
-    if (range.commonAncestorContainer.parentElement?.tagName === "MARK") { setShowToolbar(false); return; }
-    const mark = document.createElement("mark");
-    mark.className = "user-highlight";
-    range.surroundContents(mark);
-    selection.removeAllRanges();
-    setShowToolbar(false);
-  };
-
-  const removeHighlight = (e: React.MouseEvent) => {
-    const target = e.target as HTMLElement;
-    if (target.tagName === "MARK") {
-      const parent = target.parentNode!;
-      while (target.firstChild) parent.insertBefore(target.firstChild, target);
-      parent.removeChild(target);
-    }
-  };
 
   const sectionsOrder = () => {
     // Conditional sections based on mode
@@ -1271,7 +1482,7 @@ const ContentView: React.FC<ContentViewProps> = ({
                     className="content-add-btn"
                     onClick={() => {
                       setShowContentAddForm({ section: 'featuredVideo', visible: true });
-                      setContentAddFormData({ contentType: 'video', title: '', content: '', resourceType: '' });
+                      setContentAddFormData({ contentType: 'video', title: '', content: '', resourceType: '', contentFormat: 'normal' });
                     }}
                   >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1370,10 +1581,12 @@ const ContentView: React.FC<ContentViewProps> = ({
               )}
             </div>
             <div className="drive-resources-container">
-              {contentData.driveResources.map((res: any, index: number) => {
+              {contentData.driveResources && Array.isArray(contentData.driveResources) && contentData.driveResources.map((res: any, index: number) => {
                 const isOpen = openResources.has(res.id);
-                const resourceType = res.metadata?.resourceType || 'ppt'; // Default to ppt for backward compatibility
-                const isPdf = resourceType === 'pdf';
+                // FIX: PDF DETECTION - Infer from URL extension (most reliable)
+                // ❌ Don't rely on backend metadata that might be wrong
+                // ✅ Check if URL ends with .pdf
+                const isPdf = res.url?.toLowerCase().endsWith('.pdf') || false;
 
                 return (
                   <div className="resource-item" key={index}>
@@ -1397,10 +1610,10 @@ const ContentView: React.FC<ContentViewProps> = ({
                         </div>
                         <div className="resource-preview-content">
                           <h3 className="resource-preview-title">
-                            {res.title || (isPdf ? 'PDF Document' : resourceType === 'ppt' ? 'Presentation' : 'Resource')}
+                            {res.title || (isPdf ? 'PDF Document' : 'Presentation')}
                           </h3>
                           <p className="resource-preview-desc">
-                            Click to view {isPdf ? 'PDF document' : resourceType === 'ppt' ? 'presentation slides' : 'external resource'}
+                            Click to view {isPdf ? 'PDF document' : 'presentation slides'}
                           </p>
                         </div>
                         <div className="resource-preview-arrow">
@@ -1476,41 +1689,33 @@ const ContentView: React.FC<ContentViewProps> = ({
                               <span className="resource-loading-text">Loading resource...</span>
                             </div>
                           )}
-                          {isPdf ? (
-                            // Use Google Docs PDF viewer for PDFs
-                            <iframe
-                              className="resource-frame"
-                              src={`https://docs.google.com/viewer?url=${encodeURIComponent(res.url)}&embedded=true`}
-                              allow="autoplay"
-                              title={res.title}
-                              onLoad={() => setLoadingResources(prev => {
-                                const newSet = new Set(prev);
-                                newSet.delete(res.id);
-                                return newSet;
-                              })}
-                              style={{
-                                opacity: loadingResources.has(res.id) ? 0 : 1,
-                                transition: 'opacity 0.3s ease-in-out'
-                              }}
-                            />
-                          ) : (
-                            // Use direct iframe for PPTs (which work fine)
-                          <iframe
-                            className="resource-frame"
-                            src={res.url}
-                            allow="autoplay"
-                            title={res.title}
-                              onLoad={() => setLoadingResources(prev => {
-                                const newSet = new Set(prev);
-                                newSet.delete(res.id);
-                                return newSet;
-                              })}
-                              style={{
-                                opacity: loadingResources.has(res.id) ? 0 : 1,
-                                transition: 'opacity 0.3s ease-in-out'
-                              }}
-                          />
-                          )}
+                          {(() => {
+                            const embeddedUrl = getEmbeddedUrl(res.url, isPdf);
+                            return (
+                              <div>
+                                <iframe
+                                  className="resource-frame"
+                                  src={embeddedUrl}
+                                  allow="autoplay"
+                                  title={res.title}
+                                  onLoad={() => setLoadingResources(prev => {
+                                    const newSet = new Set(prev);
+                                    newSet.delete(res.id);
+                                    return newSet;
+                                  })}
+                                  onError={(e) => {
+                                    // Fallback: Try direct iframe with original URL
+                                    const iframe = e.target as HTMLIFrameElement;
+                                    iframe.src = res.url;
+                                  }}
+                                  style={{
+                                    opacity: loadingResources.has(res.id) ? 0 : 1,
+                                    transition: 'opacity 0.3s ease-in-out'
+                                  }}
+                                />
+                              </div>
+                            );
+                          })()}
                         </div>
                       </>
                     )}
@@ -1523,16 +1728,42 @@ const ContentView: React.FC<ContentViewProps> = ({
                 <div className="content-add-section">
                   {!showContentAddForm.visible || showContentAddForm.section !== 'driveResources' ? (
                     <button
-                      className="content-add-btn"
+                      className={`content-add-btn ${addResourceStatus === 'success' ? 'success' : addResourceStatus === 'error' ? 'error' : ''}`}
                       onClick={() => {
                         setShowContentAddForm({ section: 'driveResources', visible: true });
-                        setContentAddFormData({ contentType: 'drive', title: '', content: '', resourceType: 'ppt' });
+                        setContentAddFormData({ contentType: 'drive', title: '', content: '', resourceType: 'ppt', contentFormat: 'normal' });
+                        setAddResourceStatus('idle'); // Reset status when opening form
                       }}
+                      disabled={addResourceStatus === 'loading'}
                     >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M12 5v14M5 12h14"/>
-                      </svg>
-                      Add Resource
+                      {addResourceStatus === 'loading' && (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="loading-spinner">
+                          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" strokeDasharray="31.416" strokeDashoffset="31.416">
+                            <animate attributeName="stroke-dashoffset" values="31.416;0" dur="1s" repeatCount="indefinite"/>
+                          </circle>
+                        </svg>
+                      )}
+                      {addResourceStatus === 'success' && (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                      )}
+                      {addResourceStatus === 'error' && (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <circle cx="12" cy="12" r="10"/>
+                          <line x1="15" y1="9" x2="9" y2="15"/>
+                          <line x1="9" y1="9" x2="15" y2="15"/>
+                        </svg>
+                      )}
+                      {addResourceStatus === 'idle' && (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M12 5v14M5 12h14"/>
+                        </svg>
+                      )}
+                      {addResourceStatus === 'loading' ? 'Adding...' :
+                       addResourceStatus === 'success' ? 'Success!' :
+                       addResourceStatus === 'error' ? 'Try Again' :
+                       'Add Resource'}
                     </button>
                   ) : (
                     <div className="content-add-form">
@@ -1566,28 +1797,33 @@ const ContentView: React.FC<ContentViewProps> = ({
                       </div>
                       <div className="add-form-buttons">
                         <button
-                          className="add-form-submit"
-                          onClick={async () => {
-                            if (selectedSubtopic) {
-                              try {
-                                await createSubtopicContent(parseInt(selectedSubtopic.id), {
-                                  contentType: 'drive',
-                                  contentOrder: 1,
-                                  title: contentAddFormData.title,
-                                  content: contentAddFormData.content,
-                                  metadata: { resourceType: contentAddFormData.resourceType }
-                                });
-                                // Refresh content
-                                loadContentData();
-                                setShowContentAddForm({ section: '', visible: false });
-                              } catch (error) {
-                                console.error('Error adding content:', error);
-                              }
-                            }
-                          }}
-                          disabled={!contentAddFormData.title.trim() || !contentAddFormData.content.trim()}
+                          className={`add-form-submit ${addResourceStatus === 'success' ? 'success' : addResourceStatus === 'error' ? 'error' : ''}`}
+                          onClick={handleAddResource}
+                          disabled={!contentAddFormData.title.trim() || !contentAddFormData.content.trim() || addResourceStatus === 'loading'}
                         >
-                          Add
+                          {addResourceStatus === 'loading' && (
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="loading-spinner">
+                              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" strokeDasharray="31.416" strokeDashoffset="31.416">
+                                <animate attributeName="stroke-dashoffset" values="31.416;0" dur="1s" repeatCount="indefinite"/>
+                              </circle>
+                            </svg>
+                          )}
+                          {addResourceStatus === 'success' && (
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                          )}
+                          {addResourceStatus === 'error' && (
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <circle cx="12" cy="12" r="10"/>
+                              <line x1="15" y1="9" x2="9" y2="15"/>
+                              <line x1="9" y1="9" x2="15" y2="15"/>
+                            </svg>
+                          )}
+                          {addResourceStatus === 'loading' ? 'Adding...' :
+                           addResourceStatus === 'success' ? 'Added!' :
+                           addResourceStatus === 'error' ? 'Failed' :
+                           'Add'}
                         </button>
                         <button
                           className="add-form-cancel"
@@ -1637,7 +1873,7 @@ const ContentView: React.FC<ContentViewProps> = ({
                 </button>
               )}
             </div>
-            <div className="notes-container centered-content" ref={notesRef} onMouseUp={handleSelection} onClick={removeHighlight}>
+            <div className="notes-container centered-content" ref={notesRef}>
               {contentData.notesItems && contentData.notesItems.length > 0 ? (
                 contentData.notesItems.map((noteItem: any) => (
                   <div key={noteItem.id} className="note-item-wrapper">
@@ -1660,14 +1896,13 @@ const ContentView: React.FC<ContentViewProps> = ({
                         </svg>
                       </button>
                     )}
-                    <div className="note-content">{renderMarkdown(noteItem.content)}</div>
+                    <div className="note-content">{renderMarkdown(noteItem.content, noteItem.metadata?.format || 'normal')}</div>
                   </div>
                 ))
               ) : (
-                renderMarkdown(contentData.notes || '')
+                renderMarkdown(contentData.notes || '', contentData.notesMetadata?.format || 'normal')
               )}
             </div>
-            {showToolbar && <div className="highlight-toolbar" style={{ left: toolbarPos.x, top: toolbarPos.y }}><button onClick={applyHighlight}>Highlight</button></div>}
 
             {/* Add Content Button for Admin - always show for admins */}
             {isAdmin && (
@@ -1677,7 +1912,7 @@ const ContentView: React.FC<ContentViewProps> = ({
                     className="content-add-btn"
                     onClick={() => {
                       setShowContentAddForm({ section: 'notes', visible: true });
-                      setContentAddFormData({ contentType: 'notes', title: '', content: '', resourceType: '' });
+                      setContentAddFormData({ contentType: 'notes', title: '', content: '', resourceType: '', contentFormat: 'normal' });
                     }}
                   >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1702,6 +1937,18 @@ const ContentView: React.FC<ContentViewProps> = ({
                         className="content-form-textarea"
                         rows={4}
                       />
+                      <div className="content-format-selector">
+                        <label>Content Format:</label>
+                        <select
+                          value={contentAddFormData.contentFormat}
+                          onChange={(e) => setContentAddFormData({...contentAddFormData, contentFormat: e.target.value as 'normal' | 'math' | 'code'})}
+                          className="content-form-select"
+                        >
+                          <option value="normal">Normal (ChatGPT-style formatting)</option>
+                          <option value="math">Math (LaTeX/MathJax rendering)</option>
+                          <option value="code">Code/Algorithm</option>
+                        </select>
+                      </div>
                     </div>
                     <div className="add-form-buttons">
                       <button
@@ -1713,7 +1960,8 @@ const ContentView: React.FC<ContentViewProps> = ({
                                 contentType: 'notes',
                                 contentOrder: 1,
                                 title: contentAddFormData.title,
-                                content: contentAddFormData.content
+                                content: contentAddFormData.content,
+                                metadata: { format: contentAddFormData.contentFormat }
                               });
                               // Refresh content
                               loadContentData();
@@ -1776,7 +2024,7 @@ const ContentView: React.FC<ContentViewProps> = ({
             </div>
             <div className="questions-widget">
               <div className="qa-widget-list">
-                {contentData.questions.map((q: any, index: number) => (
+                {contentData.questions && Array.isArray(contentData.questions) && contentData.questions.map((q: any, index: number) => (
                   <div className="qa-widget-item" key={index}>
                     {isAdmin && (
                       <button
@@ -1802,7 +2050,9 @@ const ContentView: React.FC<ContentViewProps> = ({
                         <div className="question-content">
                           <span className="question-number">{index + 1}.</span>
                           <span className="question-text">
-                            {parseInlineFormatting(q.question)}
+                            <div className="notes-container">
+                              {renderMarkdown(q.question)}
+                            </div>
                           </span>
                         </div>
                         <svg
@@ -1820,8 +2070,8 @@ const ContentView: React.FC<ContentViewProps> = ({
                         </svg>
                       </summary>
                       <div className="qa-widget-answer">
-                        <div className="answer-content">
-                          {parseStructuredText(q.answer, true)}
+                        <div className="notes-container">
+                          {renderMarkdown(q.answer)}
                         </div>
                       </div>
                     </details>
@@ -1837,7 +2087,7 @@ const ContentView: React.FC<ContentViewProps> = ({
                       className="content-add-btn"
                       onClick={() => {
                         setShowContentAddForm({ section: 'questions', visible: true });
-                        setContentAddFormData({ contentType: 'question', title: '', content: '', resourceType: '' });
+                        setContentAddFormData({ contentType: 'question', title: '', content: '', resourceType: '', contentFormat: 'normal' });
                       }}
                     >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1864,6 +2114,18 @@ const ContentView: React.FC<ContentViewProps> = ({
                           className="content-form-textarea"
                           rows={4}
                         />
+                        <div className="content-format-selector">
+                          <label>Content Format:</label>
+                          <select
+                            value={contentAddFormData.contentFormat}
+                            onChange={(e) => setContentAddFormData({...contentAddFormData, contentFormat: e.target.value as 'normal' | 'math' | 'code'})}
+                            className="content-form-select"
+                          >
+                            <option value="normal">Normal (ChatGPT-style formatting)</option>
+                            <option value="math">Math (LaTeX/MathJax rendering)</option>
+                            <option value="code">Code/Algorithm</option>
+                          </select>
+                        </div>
                       </div>
                       <div className="add-form-buttons">
                         <button
@@ -1876,7 +2138,10 @@ const ContentView: React.FC<ContentViewProps> = ({
                                   contentOrder: 1,
                                   title: contentAddFormData.title, // Question goes in title
                                   content: '', // Empty content
-                                  metadata: { answer: contentAddFormData.content } // Answer goes in metadata
+                                  metadata: { 
+                                    answer: contentAddFormData.content,
+                                    format: contentAddFormData.contentFormat
+                                  } // Answer and format go in metadata
                                 });
                                 // Refresh content
                                 loadContentData();
@@ -1909,13 +2174,22 @@ const ContentView: React.FC<ContentViewProps> = ({
   };
 
   // Render fullscreen resource if one is selected
+  // HARD GUARD: Prevent recursive ContentView rendering
   if (fullscreenResource) {
     const resources = contentData?.driveResources || [];
     const currentIndex = resources.findIndex((res: any) => res.id === fullscreenResource);
     const resource = resources[currentIndex];
+
+    // Safety check to prevent infinite recursion
+    if (!resource) {
+      console.error("Resource not found for fullscreen:", fullscreenResource);
+      return null;
+    }
     const hasMultipleResources = resources.length > 1;
-    const resourceType = resource?.metadata?.resourceType || 'ppt';
-    const isPdf = resourceType === 'pdf';
+    // FIX: PDF DETECTION - Infer from URL extension (most reliable)
+    // ❌ Don't rely on backend metadata that might be wrong
+    // ✅ Check if URL ends with .pdf
+    const isPdf = resource?.url?.toLowerCase().endsWith('.pdf') || false;
 
     const navigateToResource = (direction: 'prev' | 'next') => {
       if (!hasMultipleResources) return;
@@ -1981,39 +2255,33 @@ const ContentView: React.FC<ContentViewProps> = ({
                 <span className="resource-loading-text">Loading resource...</span>
               </div>
             )}
-            {isPdf ? (
-              <iframe
-                className="resource-fullscreen-iframe"
-                src={`https://docs.google.com/viewer?url=${encodeURIComponent(resource.url)}&embedded=true`}
-                allow="autoplay"
-                title={resource.title}
-                onLoad={() => setLoadingResources(prev => {
-                  const newSet = new Set(prev);
-                  newSet.delete(resource.id);
-                  return newSet;
-                })}
-                style={{
-                  opacity: loadingResources.has(resource.id) ? 0 : 1,
-                  transition: 'opacity 0.3s ease-in-out'
-                }}
-              />
-            ) : (
-            <iframe
-              className="resource-fullscreen-iframe"
-              src={resource.url}
-              allow="autoplay"
-              title={resource.title}
-                onLoad={() => setLoadingResources(prev => {
-                  const newSet = new Set(prev);
-                  newSet.delete(resource.id);
-                  return newSet;
-                })}
-                style={{
-                  opacity: loadingResources.has(resource.id) ? 0 : 1,
-                  transition: 'opacity 0.3s ease-in-out'
-                }}
-            />
-            )}
+            {(() => {
+              const embeddedUrl = getEmbeddedUrl(resource.url, isPdf);
+              return (
+                <div>
+                  <iframe
+                    className="resource-fullscreen-iframe"
+                    src={embeddedUrl}
+                    allow="autoplay"
+                    title={resource.title}
+                    onLoad={() => setLoadingResources(prev => {
+                      const newSet = new Set(prev);
+                      newSet.delete(resource.id);
+                      return newSet;
+                    })}
+                    onError={(e) => {
+                      // Fallback: Try direct iframe with original URL
+                      const iframe = e.target as HTMLIFrameElement;
+                      iframe.src = resource.url;
+                    }}
+                    style={{
+                      opacity: loadingResources.has(resource.id) ? 0 : 1,
+                      transition: 'opacity 0.3s ease-in-out'
+                    }}
+                  />
+                </div>
+              );
+            })()}
           </div>
         </div>
       );
@@ -2132,7 +2400,7 @@ const ContentView: React.FC<ContentViewProps> = ({
             </div>
           </div>
         )}
-        {contentData && sectionsOrder().map((section) => renderSection(section))}
+        {contentData && Array.isArray(sectionsOrder()) && sectionsOrder().map((section) => renderSection(section))}
 
         {/* Admin Panel - Only show for admin users */}
         {isAdmin && showAdminPanel && (
@@ -2181,7 +2449,7 @@ const ContentView: React.FC<ContentViewProps> = ({
                     onChange={(e) => setAdminFormData({...adminFormData, collegeId: e.target.value})}
                   >
                     <option value="">Select College</option>
-                    {adminColleges.map((college: any) => (
+                    {Array.isArray(adminColleges) && adminColleges.map((college: any) => (
                       <option key={college.id} value={college.id}>
                         {college.name}
                       </option>
@@ -2205,7 +2473,7 @@ const ContentView: React.FC<ContentViewProps> = ({
                     onChange={(e) => setAdminFormData({...adminFormData, collegeId: e.target.value, departmentId: ''})}
                   >
                     <option value="">Select College First</option>
-                    {adminColleges.map((college: any) => (
+                    {Array.isArray(adminColleges) && adminColleges.map((college: any) => (
                       <option key={college.id} value={college.id}>
                         {college.name}
                       </option>
@@ -2219,7 +2487,7 @@ const ContentView: React.FC<ContentViewProps> = ({
                     <option value="">
                       {adminFormData.collegeId ? 'Select Department' : 'Select College First'}
                     </option>
-                    {adminDepartments.map((department: any) => (
+                    {Array.isArray(adminDepartments) && adminDepartments.map((department: any) => (
                       <option key={department.id} value={department.id}>
                         {department.name}
                       </option>
@@ -2227,7 +2495,7 @@ const ContentView: React.FC<ContentViewProps> = ({
                   </select>
                   <input
                     type="text"
-                    placeholder="Semester Name (e.g., I, II, III)"
+                    placeholder="Semester Name (e.g SEMESTER 1)"
                     value={adminFormData.name}
                     onChange={(e) => setAdminFormData({...adminFormData, name: e.target.value})}
                   />

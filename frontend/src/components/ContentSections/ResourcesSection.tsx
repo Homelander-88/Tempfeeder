@@ -1,5 +1,24 @@
 import React, { useState } from 'react';
 
+const getEmbeddedUrl = (url: string, isPdf: boolean) => {
+  // Extract file ID from Google Drive sharing URL
+  const fileIdMatch = url.match(/\/file\/d\/([a-zA-Z0-9-_]+)/);
+  if (!fileIdMatch) return url;
+
+  const fileId = fileIdMatch[1];
+
+  if (isPdf) {
+    // 🎯 GITHUB PDF: Construct full GitHub raw URL from filename
+    // Base URL: https://raw.githubusercontent.com/SUGANTH-V-27/pdf-storage/main/
+    const githubBaseUrl = 'https://raw.githubusercontent.com/SUGANTH-V-27/pdf-storage/main/';
+    const fullPdfUrl = githubBaseUrl + url; // url is just the filename
+    return `https://mozilla.github.io/pdf.js/web/viewer.html?file=${encodeURIComponent(fullPdfUrl)}`;
+  } else {
+    // For PPTs and other files: Use Google Docs viewer with preview URL
+    return `https://docs.google.com/viewer?url=${encodeURIComponent(`https://drive.google.com/uc?id=${fileId}`)}&embedded=true`;
+  }
+};
+
 interface Resource {
   id: number;
   title?: string;
@@ -160,7 +179,7 @@ export const ResourcesSection: React.FC<ResourcesSectionProps> = ({
                       // Use Google Docs PDF viewer for PDFs
                       <iframe
                         className="resource-frame"
-                        src={`https://docs.google.com/viewer?url=${encodeURIComponent(res.url)}&embedded=true`}
+                        src={getEmbeddedUrl(res.url, true)}
                         allow="autoplay"
                         title={res.title}
                         onLoad={() => setLoadingResources(prev => {

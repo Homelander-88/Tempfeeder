@@ -534,10 +534,10 @@ body {
 }
 
 .notes-container.centered-content {
-  text-align: left;
+  text-align: center;
   width: 100%;
-  justify-content: flex-start; /* Align content to left instead of center */
-  align-items: flex-start; /* Align items to left */
+  justify-content: center; /* Center content horizontally */
+  align-items: center; /* Center items vertically */
 }
 
 .play-icon {
@@ -792,7 +792,7 @@ body {
   color: var(--text-primary);
   line-height: 1.8;
   margin-bottom: 1.25rem;
-  text-align: left;
+  text-align: center;
   width: 100%;
   font-size: 1.05rem;
   word-wrap: break-word;
@@ -817,7 +817,7 @@ body {
   font-size: 1.05rem;
   position: relative;
   padding-left: 1.5rem; /* Add space for bullet point */
-  text-align: left;
+  text-align: center;
 }
 
 .structured-list-item::before {
@@ -847,7 +847,7 @@ body {
   color: var(--text-primary);
   line-height: 1.8;
   margin-bottom: 0.75rem;
-  text-align: left;
+  text-align: center;
   width: 100%;
   font-size: 1.05rem;
   word-wrap: break-word;
@@ -952,6 +952,7 @@ body {
   color: var(--text-secondary);
   line-height: 1.6;
   position: relative;
+  text-align: center;
 }
 
 .structured-blockquote::before {
@@ -1053,7 +1054,6 @@ body {
 }
 
 .markdown-link:hover {
-  text-decoration: underline;
   opacity: 0.8;
 }
 
@@ -1301,6 +1301,7 @@ body {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   animation: resourceExpand 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
+
 
 .resource-loading {
   position: absolute;
@@ -1585,9 +1586,9 @@ body {
 
 .qa-widget-question {
   display: flex;
-  align-items: flex-start;
+  align-items: center; /* Changed from flex-start to center for proper alignment */
   justify-content: space-between;
-  padding: 20px;
+  padding: 20px; /* Added consistent padding */
   cursor: pointer;
   background: var(--card-background);
   border: 1px solid var(--border-subtle);
@@ -1612,9 +1613,10 @@ body {
 
 .question-content {
   display: flex;
-  align-items: flex-start;
+  align-items: center; /* Align with parent container */
   flex: 1;
   gap: 8px;
+  padding: 0; /* Remove padding since parent now has it */
 }
 
 .question-text {
@@ -1628,9 +1630,20 @@ body {
   white-space: pre-wrap; /* Preserve newlines */
 }
 
+.question-content .notes-container {
+  padding: 0; /* No extra padding for questions */
+}
+
+.question-content .notes-container .notes-structured {
+  padding: 0; /* No padding for inline questions */
+  margin: 0;
+  max-width: none;
+  display: inline; /* Keep questions inline */
+}
+
 .dropdown-arrow {
   color: var(--text-secondary);
-  margin-left: 16px;
+  margin-left: auto; /* Push to the right */
   flex-shrink: 0;
   transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   width: 18px;
@@ -1644,7 +1657,7 @@ body {
 }
 
 .qa-widget-answer {
-  padding: 20px;
+  padding: 0;
   background: rgba(0, 0, 0, 0.08);
   border: 1px solid var(--border-subtle);
   border-top: none;
@@ -1726,15 +1739,16 @@ body {
   text-align: center;
 }
 
-.answer-content {
-  color: var(--text-primary);
-  line-height: 1.7;
-  font-size: 1.05rem;
-  word-wrap: break-word;
-  hyphens: auto;
-  text-align: left;
-  width: 100%;
-  white-space: pre-wrap; /* Preserve newlines */
+/* .answer-content styles removed - now using .notes-container structure */
+
+.qa-widget-answer .notes-container {
+  padding: 20px; /* Add padding to maintain visual spacing */
+}
+
+.qa-widget-answer .notes-container .notes-structured {
+  padding: 0 32px; /* Same padding as main text section */
+  margin: 0 auto;
+  max-width: 900px;
 }
 
 /* ===== Section Header with Delete Button ===== */
@@ -1793,10 +1807,27 @@ body {
   transition: all 0.2s ease;
 }
 
-.content-add-btn:hover {
+.content-add-btn:hover:not(:disabled) {
   background: rgba(37, 99, 235, 0.15);
   border-color: var(--primary-accent);
   transform: translateY(-1px);
+}
+
+.content-add-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.content-add-btn.success {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+}
+
+.content-add-btn.error {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
 }
 
 .content-add-form {
@@ -1850,6 +1881,76 @@ body {
 .content-form-select:focus {
   outline: none;
   border-color: var(--primary-accent);
+}
+
+.add-form-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.add-form-submit,
+.add-form-cancel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.add-form-submit {
+  background: var(--primary-accent);
+  color: white;
+}
+
+.add-form-submit:hover:not(:disabled) {
+  background: rgba(37, 99, 235, 0.8);
+  transform: translateY(-1px);
+}
+
+.add-form-submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.add-form-submit.success {
+  background: #22c55e;
+}
+
+.add-form-submit.error {
+  background: #ef4444;
+}
+
+.add-form-cancel {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+}
+
+.add-form-cancel:hover {
+  background: var(--background-dark);
+  border-color: var(--border-primary);
+}
+
+/* Loading spinner animation */
+.loading-spinner circle {
+  transform-origin: center;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 
@@ -2432,3 +2533,4 @@ body {
   border: none;
   background: var(--background-dark);
 }
+

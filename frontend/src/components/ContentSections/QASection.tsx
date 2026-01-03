@@ -1,9 +1,31 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { processMathExpressions, isStandaloneMathLine } from '../../utils/mathProcessor';
+import { convertLatexToUnicode } from '../../utils/latexToUnicode';
+
+declare global {
+  interface Window {
+    MathJax?: {
+      typesetPromise: (elements?: HTMLElement[]) => Promise<void>;
+      startup: {
+        ready: () => void;
+      };
+      config: {
+        tex: {
+          inlineMath: string[][];
+          displayMath: string[][];
+        };
+      };
+    };
+  }
+}
 
 interface QAItem {
   id: number;
   question: string;
   answer: string;
+  metadata?: {
+    format?: string;
+  };
 }
 
 interface QASectionProps {
@@ -23,41 +45,34 @@ export const QASection: React.FC<QASectionProps> = ({
 }) => {
   const [_openQuestions, _setOpenQuestions] = useState<Set<number>>(new Set());
 
+  // Initialize MathJax
+  useEffect(() => {
+    if (window.MathJax) {
+      window.MathJax.typesetPromise().catch((err: Error) => {
+        console.warn('MathJax typeset error:', err);
+      });
+    }
+  }, [questions]);
+
   // Parse and render structured text with visual elements for hierarchy
-  const parseStructuredText = (text: string, enableCodeDetection: boolean = false) => {
+  const parseStructuredText = (text: string, contentFormat: string = 'normal') => {
     if (!text || text.trim() === '') {
       return [<p key="empty" className="structured-paragraph">No content available</p>];
     }
 
-    // If code detection is enabled, check if entire text should be treated as code
-    if (enableCodeDetection) {
-      const hasCodeContent = text.split('\n').some(line => {
-        const trimmed = line.trim();
-        // Function definitions
-        if (trimmed.match(/^(function|def|class|public|private|void|int|string|bool|const|let|var)\s+\w+/)) return true;
-        // Algorithm/pseudocode patterns
-        if (trimmed.match(/^(if|for|while|do|BEGIN|END|READ|FOR|WHILE|IF|ELSE|RETURN)\s|\w+\([^)]*\)\s*[:{]|\w+\s*\([^)]*\)\s*{/)) return true;
-        // Array access patterns
-        if (trimmed.match(/[A-Z]\[[^\]]+\]/)) return true;
-        // Assignment with code-like syntax
-        if (trimmed.match(/^\w+\s*=\s*[^=]/) && (trimmed.includes('[') || trimmed.includes('(') || trimmed.includes('{'))) return true;
-        return false;
-      });
-
-      // If text contains code patterns, render entire text as one code block
-      if (hasCodeContent) {
-        return [
-          <pre
-            key="full-code-block"
-            className="structured-code-block"
-            data-language="text"
-          >
-            <code className="language-text">
-              {text}
-            </code>
-          </pre>
-        ];
-      }
+    // If format is 'code', render entire text as code block
+    if (contentFormat === 'code') {
+      return [
+        <pre
+          key="full-code-block"
+          className="structured-code-block"
+          data-language="text"
+        >
+          <code className="language-text">
+            {text}
+          </code>
+        </pre>
+      ];
     }
 
     // Content parsing for regular text sections
@@ -101,7 +116,7 @@ export const QASection: React.FC<QASectionProps> = ({
                 <tr>
                   {tableHeaders.map((header, index) => (
                     <th key={index} className="structured-table-header">
-                      {parseInlineFormatting(header.trim())}
+                      {parseInlineFormatting(header.trim(), contentFormat === 'math', contentFormat === 'normal')}
                     </th>
                   ))}
                 </tr>
@@ -112,7 +127,7 @@ export const QASection: React.FC<QASectionProps> = ({
                 <tr key={rowIndex}>
                   {row.map((cell, cellIndex) => (
                     <td key={cellIndex} className="structured-table-cell">
-                      {parseInlineFormatting(cell.trim())}
+                      {parseInlineFormatting(cell.trim(), contentFormat === 'math', contentFormat === 'normal')}
                     </td>
                   ))}
                 </tr>
@@ -126,9 +141,44 @@ export const QASection: React.FC<QASectionProps> = ({
       }
     };
 
-    const parseInlineFormatting = (text: string) => {
+    const parseInlineFormatting = (text: string, enableMath: boolean = false, convertToUnicode: boolean = false) => {
       if (!text) return text;
+      
       let formattedText = text;
+      
+      // Convert LaTeX to Unicode if requested (for normal format)
+      if (convertToUnicode) {
+        formattedText = convertLatexToUnicode(formattedText);
+        // Also remove square brackets from math-like content
+        formattedText = formattedText.replace(/\[([^\]]+)\]/g, (match, content) => {
+          const trimmed = content.trim();
+          // Check if it's a link
+          const matchIndex = formattedText.indexOf(match);
+          const afterMatch = formattedText.substring(matchIndex + match.length);
+          if (/^\s*\(/.test(afterMatch)) return match; // Keep links
+          // Remove brackets from math-like content
+          if (/[≥≤∈∉∑∏∫√\d\s=<>\\\^_\{\}\(\)]/.test(trimmed) && trimmed.length > 2) {
+            return trimmed; // Remove brackets
+          }
+          return match;
+        });
+      }
+      
+      // Process math expressions first - only if math is enabled
+      if (enableMath) {
+        formattedText = processMathExpressions(formattedText, true, false);
+      }
+
+      // Escape HTML entities
+      formattedText = formattedText
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+
+      // Links [text](url) - process before other formatting
+      formattedText = formattedText.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="structured-link" target="_blank" rel="noopener noreferrer">$1</a>');
 
       // Inline code (`code`) - preserves exact characters
       formattedText = formattedText.replace(/`([^`\n]+)`/g, (_match, code) => {
@@ -149,9 +199,6 @@ export const QASection: React.FC<QASectionProps> = ({
       // Strikethrough (~~text~~)
       formattedText = formattedText.replace(/~~(.*?)~~/g, '<del class="structured-strikethrough">$1</del>');
 
-      // Links [text](url)
-      formattedText = formattedText.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="structured-link" target="_blank" rel="noopener noreferrer">$1</a>');
-
       return <span dangerouslySetInnerHTML={{ __html: formattedText }} />;
     };
 
@@ -159,6 +206,11 @@ export const QASection: React.FC<QASectionProps> = ({
       const line = lines[index];
       const trimmedLine = line.trim();
       const leadingSpaces = line.length - line.trimLeft().length;
+
+      // Skip standalone square brackets (just [ or ] on their own line)
+      if (trimmedLine === '[' || trimmedLine === ']') {
+        continue; // Skip this line
+      }
 
       // Table detection (dot-separated format)
       if (trimmedLine.includes(' . ') || trimmedLine.includes(' | ')) {
@@ -190,7 +242,7 @@ export const QASection: React.FC<QASectionProps> = ({
         const className = `structured-heading structured-h${level}`;
         elements.push(
           <div key={`header-${index}`} className={className}>
-            {parseInlineFormatting(content)}
+            {parseInlineFormatting(content, contentFormat === 'math', contentFormat === 'normal')}
           </div>
         );
         continue;
@@ -211,7 +263,7 @@ export const QASection: React.FC<QASectionProps> = ({
         const content = trimmedLine.substring(1).trim();
         elements.push(
           <blockquote key={`blockquote-${index}`} className="structured-blockquote">
-            {parseInlineFormatting(content)}
+            {parseInlineFormatting(content, contentFormat === 'math', contentFormat === 'normal')}
           </blockquote>
         );
         continue;
@@ -237,7 +289,7 @@ export const QASection: React.FC<QASectionProps> = ({
 
         listItems.push(
           <li key={`item-${index}`} className="structured-list-item" style={{ marginLeft: `${leadingSpaces * 20}px` }}>
-            {parseInlineFormatting(content)}
+            {parseInlineFormatting(content, contentFormat === 'math', contentFormat === 'normal')}
           </li>
         );
         continue;
@@ -251,13 +303,88 @@ export const QASection: React.FC<QASectionProps> = ({
         continue;
       }
 
+      // Block math detection ($$...$$ or \[...\])
+      const blockMathMatch = trimmedLine.match(/^\$\$([^$]+)\$\$$/) || trimmedLine.match(/^\\\[([^\]]+)\\\]$/);
+      if (blockMathMatch) {
+        flushList();
+        flushTable();
+        const mathContent = blockMathMatch[1].trim();
+        elements.push(
+          <div key={`math-${index}`} className="math-block" style={{ margin: '1em 0', textAlign: 'center' }}>
+            <span className="math-display">$${mathContent}$$</span>
+          </div>
+        );
+        continue;
+      }
+
+      // Check if line is a standalone math expression (possibly in square brackets)
+      if (isStandaloneMathLine(trimmedLine)) {
+        flushList();
+        flushTable();
+        
+        if (contentFormat === 'math') {
+          // For math format: use MathJax
+          let processedLine = processMathExpressions(trimmedLine, true, false);
+          
+          // Ensure it's in block math format
+          if (!processedLine.trim().startsWith('$$')) {
+            const mathMatch = processedLine.match(/\$\$([^$]+)\$\$/) || processedLine.match(/\\\(([^\)]+)\\\)/);
+            if (mathMatch) {
+              processedLine = `$$${mathMatch[1].trim()}$$`;
+            } else {
+              processedLine = `$$${processedLine.trim()}$$`;
+            }
+          }
+          
+          const mathContentMatch = processedLine.match(/\$\$([^$]+)\$\$/);
+          const mathContent = mathContentMatch ? mathContentMatch[1].trim() : processedLine.replace(/\$\$/g, '').trim();
+          
+          elements.push(
+            <div key={`math-block-${index}`} className="math-block" style={{ margin: '1em 0', textAlign: 'center' }}>
+              <span className="math-display">$${mathContent}$$</span>
+            </div>
+          );
+        } else {
+          // For normal format: remove brackets, convert LaTeX to Unicode, display as centered text
+          let processedLine = trimmedLine;
+          // Remove square brackets
+          processedLine = processedLine.replace(/\[([^\]]+)\]/g, (match, content) => {
+            const trimmed = content.trim();
+            // Check if it's a link
+            const matchIndex = processedLine.indexOf(match);
+            const afterMatch = processedLine.substring(matchIndex + match.length);
+            if (/^\s*\(/.test(afterMatch)) return match; // Keep links
+            // Remove brackets from math-like content
+            if (/[≥≤∈∉∑∏∫√\d\s=<>\\\^_\{\}\(\)]/.test(trimmed) && trimmed.length > 2) {
+              return trimmed;
+            }
+            return match;
+          });
+          // Convert LaTeX to Unicode
+          processedLine = convertLatexToUnicode(processedLine);
+          
+          elements.push(
+            <div key={`math-block-${index}`} className="math-block" style={{ margin: '1em 0', textAlign: 'center', fontFamily: 'monospace' }}>
+              {processedLine}
+            </div>
+          );
+        }
+        continue;
+      }
+
       // Regular paragraphs (if not in a list or table)
       if (!inList && !inTable) {
         flushList();
         flushTable();
+        // Process based on format
+        let processedLine = trimmedLine;
+        if (contentFormat === 'math') {
+          processedLine = processMathExpressions(trimmedLine, true, false);
+        }
+        // For normal format, conversion happens in parseInlineFormatting
         elements.push(
           <p key={`para-${index}`} className="structured-paragraph">
-            {parseInlineFormatting(trimmedLine)}
+            {parseInlineFormatting(processedLine, contentFormat === 'math', contentFormat === 'normal')}
           </p>
         );
       }
@@ -337,7 +464,7 @@ export const QASection: React.FC<QASectionProps> = ({
             </summary>
             <div className="qa-widget-answer">
               <div className="answer-content">
-                {parseStructuredText(q.answer, true)}
+                {parseStructuredText(q.answer, q.metadata?.format || 'normal')}
               </div>
             </div>
           </details>

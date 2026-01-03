@@ -39,11 +39,19 @@
     "axios": "^1.13.2",
     "class-variance-authority": "^0.7.1",
     "framer-motion": "^12.23.26",
+    "katex": "^0.16.27",
     "lucide-react": "^0.562.0",
+    "mathjax": "^3.2.2",
+    "pdfjs-dist": "^5.4.530",
     "react": "^19.2.0",
     "react-day-picker": "^9.13.0",
     "react-dom": "^19.2.0",
-    "react-error-boundary": "^6.0.1"
+    "react-error-boundary": "^6.0.1",
+    "react-markdown": "^10.1.0",
+    "react-pdf": "^10.3.0",
+    "rehype-katex": "^7.0.1",
+    "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

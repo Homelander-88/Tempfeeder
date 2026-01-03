@@ -49,6 +49,7 @@ const CollegeDepartment = ({ onNavigateToContent }: CollegeDepartmentProps) => {
     loadColleges();
   }, []);
 
+  // Load departments when college is selected
   useEffect(() => {
     if (!hierarchy.college) return;
     setDepartments([]);
@@ -58,6 +59,7 @@ const CollegeDepartment = ({ onNavigateToContent }: CollegeDepartmentProps) => {
     loadDepartments();
   }, [hierarchy.college]);
 
+  // Load semesters when department is selected
   useEffect(() => {
     if (!hierarchy.department) return;
     setSemesters([]);
@@ -125,6 +127,7 @@ const CollegeDepartment = ({ onNavigateToContent }: CollegeDepartmentProps) => {
     const newHierarchy = {
       ...hierarchy,
       [field]: value,
+      // Clear subsequent fields when changing parent selection
       ...(field === 'college' && { department: '', semester: '' }),
       ...(field === 'department' && { semester: '' }),
     };

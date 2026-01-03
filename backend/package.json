@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "nodemon --exec ts-node src/server.ts",
     "build": "tsc",
-    "start": "node --max-old-space-size=256 dist/server.js",
+    "start": "node --max-old-space-size=512 dist/server.js",
     "health": "curl -f http://localhost:5000/api/health || exit 1"
   },
   "keywords": [],
@@ -24,9 +24,12 @@
     "helmet": "^8.1.0",
     "joi": "^18.0.2",
     "jsonwebtoken": "^9.0.3",
+    "katex": "^0.16.27",
     "node-fetch": "^2.7.0",
     "nodemailer": "^7.0.12",
     "pg": "^8.16.3",
+    "rehype-katex": "^7.0.1",
+    "remark-math": "^6.0.0",
     "winston": "^3.19.0"
   },
   "devDependencies": {
