@@ -5,16 +5,18 @@ import { createClient } from '@supabase/supabase-js';
 // Load environment variables from .env file
 config();
 
+// Optimized for Vercel serverless - connection pooling is critical
+// Vercel functions are stateless, so we need efficient connection management
 const pool = new Pool({
     host: process.env.DB_HOST,
     port: parseInt(process.env.DB_PORT || "5432"),
     database: process.env.DB_NAME,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
-    // Optimized for Render free tier - conservative settings
-    max: process.env.NODE_ENV === 'production' ? 5 : 20, // Reduced to 5 for Render free tier (limited connections)
-    min: 0, // Don't keep idle connections - let them close (Render free tier limitation)
-    idleTimeoutMillis: 30000, // Close idle connections after 30s (Render free tier)
+    // Vercel serverless optimization - smaller pool per function instance
+    max: process.env.VERCEL ? 2 : (process.env.NODE_ENV === 'production' ? 5 : 20), // 2 for Vercel (serverless), 5 for traditional prod
+    min: 0, // Don't keep idle connections - important for serverless
+    idleTimeoutMillis: process.env.VERCEL ? 10000 : 30000, // 10s for Vercel (faster cleanup), 30s for traditional
     connectionTimeoutMillis: 5000, // 5s timeout - fail fast if can't connect
     allowExitOnIdle: true,
     // SSL settings for production

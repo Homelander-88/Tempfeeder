@@ -7,7 +7,8 @@ import nodemailer from "nodemailer";
 import Joi from "joi";
 import winston from "winston";
 
-// Logger configuration
+// Logger configuration - optimized for Vercel serverless
+// Vercel doesn't support file-based logging, so we use console only
 const logger = winston.createLogger({
   level: 'info',
   format: winston.format.combine(
@@ -15,7 +16,7 @@ const logger = winston.createLogger({
     winston.format.json()
   ),
   transports: [
-    new winston.transports.File({ filename: 'logs/auth.log' }),
+    // Always use console for Vercel (file logging doesn't work in serverless)
     new winston.transports.Console({
       format: winston.format.combine(
         winston.format.colorize(),

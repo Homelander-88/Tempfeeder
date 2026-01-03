@@ -7,7 +7,9 @@ import compression from "compression";
 import winston from "winston";
 import {fullRouter} from "./routes/index";
 
-// Simple in-memory cache for Render optimization
+const app = express();
+
+// Simple in-memory cache for Vercel serverless optimization
 const cache = new Map();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
@@ -34,7 +36,8 @@ const cacheMiddleware = (ttl: number = CACHE_TTL) => {
   };
 };
 
-// Logger configuration
+// Logger configuration - optimized for Vercel serverless
+// Vercel doesn't support file-based logging, so we use console only
 const logger = winston.createLogger({
   level: 'info',
   format: winston.format.combine(
@@ -44,25 +47,18 @@ const logger = winston.createLogger({
   ),
   defaultMeta: { service: 'spoonfeeder-backend' },
   transports: [
-    // Write all logs with importance level of `error` or less to `error.log`
-    new winston.transports.File({ filename: 'logs/error.log', level: 'error' }),
-    // Write all logs with importance level of `info` or less to `combined.log`
-    new winston.transports.File({ filename: 'logs/combined.log' }),
+    // Always use console for Vercel (file logging doesn't work in serverless)
+    new winston.transports.Console({
+      format: winston.format.combine(
+        winston.format.colorize(),
+        winston.format.simple()
+      )
+    })
   ],
 });
 
-// If we're not in production then log to the `console` with a simple format
-if (process.env.NODE_ENV !== 'production') {
-  logger.add(new winston.transports.Console({
-    format: winston.format.combine(
-      winston.format.colorize(),
-      winston.format.simple()
-    )
-  }));
-}
-
-const app = express();
-const PORT = parseInt(process.env.PORT || "5000", 10);
+// Vercel automatically assigns PORT, but we need a default for local development
+const PORT = process.env.VERCEL ? undefined : parseInt(process.env.PORT || "5000", 10);
 
 async function testConnection(retries: number = 3, delay: number = 2000){
     for (let i = 0; i < retries; i++) {
@@ -140,9 +136,10 @@ app.use((req: express.Request, res: express.Response, next: express.NextFunction
 });
 
 // Hard request timeout safety net - prevents infinite hanging requests
-// This guarantees no request can hang forever, even if something goes wrong
+// Vercel has different timeouts: 10s (Hobby), 60s (Pro), 900s (Enterprise)
+// Using 50s as a safe default (works for Pro tier, fails fast on Hobby)
+const TIMEOUT_MS = process.env.VERCEL ? 50000 : 25000; // 50s for Vercel, 25s for local development
 app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
-  const TIMEOUT_MS = 25000; // 25 seconds (matches Render's timeout)
   const timer = setTimeout(() => {
     if (!res.headersSent) {
       logger.warn('Request timeout - forcing response', {
@@ -173,8 +170,8 @@ const corsOptions = {
       'http://localhost:3001', // Alternative port
       'http://localhost:3002', // Alternative port
       'http://localhost:8080', // Another common dev port
-      'https://spoonfeeders.vercel.app', // Production Vercel
-      'https://spoonfeeder-three.vercel.app', // Alternative Vercel
+      'https://spoonfeeders.vercel.app', // Production Vercel frontend
+      'https://spoonfeederz.vercel.app', // Vercel backend (for API calls)
       process.env.FRONTEND_URL // Environment variable
     ].filter(Boolean); // Remove undefined values
 
@@ -273,31 +270,32 @@ async function startServer() {
         // Wait for database connection before starting server
         await testConnection();
         
-        const server = app.listen(PORT, "0.0.0.0", () => {
-            logger.info(`Server is running on port ${PORT}`, {
-                port: PORT,
-                host: "0.0.0.0",
-                environment: process.env.NODE_ENV || 'development',
-                nodeVersion: process.version,
-                memoryLimit: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + 'MB',
-                platform: process.platform
+        // Only start server if not on Vercel (Vercel handles server lifecycle)
+        if (!process.env.VERCEL && PORT) {
+            const server = app.listen(PORT, "0.0.0.0", () => {
+                logger.info(`Server is running on port ${PORT}`, {
+                    port: PORT,
+                    host: "0.0.0.0",
+                    environment: process.env.NODE_ENV || 'development',
+                    nodeVersion: process.version,
+                    memoryLimit: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + 'MB',
+                    platform: process.platform
+                });
             });
-        });
 
-        // Render-specific optimizations
-        if (process.env.RENDER || process.env.NODE_ENV === 'production') {
-            // Render-specific settings for better cold start performance
-            server.keepAliveTimeout = 75000; // 75 seconds (Render's timeout)
-            server.headersTimeout = 76000;
-            server.timeout = 25000; // 25 seconds (Render's request timeout)
+            // Local development optimizations
+            server.keepAliveTimeout = 65000;
+            server.headersTimeout = 66000;
+            server.timeout = 25000;
 
-            // Limit concurrent connections for Render free tier (conservative limit)
-            server.maxConnections = 25;
-
-            // Enable TCP keep-alive for persistent connections
-            server.on('connection', (socket) => {
-                socket.setKeepAlive(true, 60000); // 60 seconds
-                socket.setTimeout(25000);
+            // Handle server startup errors
+            server.on('error', (error: any) => {
+                if (error.code === 'EADDRINUSE') {
+                    logger.error(`Port ${PORT} is already in use`, { error: error.message });
+                } else {
+                    logger.error('Server startup error', { error: error.message });
+                }
+                process.exit(1);
             });
 
             // Clean up cache periodically to prevent memory bloat
@@ -308,26 +306,31 @@ async function startServer() {
                         cache.delete(key);
                     }
                 }
-                // Force garbage collection hint (V8 optimization)
-                if (global.gc) {
-                    global.gc();
-                }
             }, 300000); // Every 5 minutes
+        } else {
+            logger.info('Running on Vercel - serverless mode', {
+                environment: process.env.NODE_ENV || 'development',
+                nodeVersion: process.version
+            });
         }
-
-        // Handle server startup errors
-        server.on('error', (error: any) => {
-            if (error.code === 'EADDRINUSE') {
-                logger.error(`Port ${PORT} is already in use`, { error: error.message });
-            } else {
-                logger.error('Server startup error', { error: error.message });
-            }
-            process.exit(1);
-        });
     } catch (error) {
         logger.error('Failed to start server - database connection failed', { error });
         process.exit(1);
     }
 }
 
-startServer();
+// Initialize database connection
+if (process.env.VERCEL) {
+    // For Vercel serverless: test connection once when function container initializes
+    // This helps catch connection issues early without blocking requests
+    testConnection().catch((err) => {
+        logger.error('Database connection test failed on Vercel initialization', { error: err });
+        // Don't exit - let individual requests handle connection errors
+    });
+} else {
+    // Traditional server startup for development/local
+    startServer();
+}
+
+// Always export the app (ES modules) - Vercel handles server lifecycle
+export default app;
