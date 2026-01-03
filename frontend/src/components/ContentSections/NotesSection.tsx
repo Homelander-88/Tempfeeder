@@ -1,4 +1,22 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { processMathExpressions, isStandaloneMathLine } from '../../utils/mathProcessor';
+
+declare global {
+  interface Window {
+    MathJax?: {
+      typesetPromise: (elements?: HTMLElement[]) => Promise<void>;
+      startup: {
+        ready: () => void;
+      };
+      config: {
+        tex: {
+          inlineMath: string[][];
+          displayMath: string[][];
+        };
+      };
+    };
+  }
+}
 
 interface NotesSectionProps {
   notes: string;
@@ -11,6 +29,15 @@ export const NotesSection: React.FC<NotesSectionProps> = ({
   isAdmin,
   onEditNotes
 }) => {
+  // Initialize MathJax
+  useEffect(() => {
+    if (window.MathJax) {
+      window.MathJax.typesetPromise().catch((err: Error) => {
+        console.warn('MathJax typeset error:', err);
+      });
+    }
+  }, [notes]);
+
   // Parse and render structured text with visual elements for hierarchy
   const parseStructuredText = (text: string) => {
     if (!text || text.trim() === '') {
@@ -85,7 +112,20 @@ export const NotesSection: React.FC<NotesSectionProps> = ({
 
     const parseInlineFormatting = (text: string) => {
       if (!text) return text;
-      let formattedText = text;
+      
+      // Process math expressions first
+      let formattedText = processMathExpressions(text);
+
+      // Escape HTML entities
+      formattedText = formattedText
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+
+      // Links [text](url) - process before other formatting
+      formattedText = formattedText.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="structured-link" target="_blank" rel="noopener noreferrer">$1</a>');
 
       // Inline code (`code`) - preserves exact characters
       formattedText = formattedText.replace(/`([^`\n]+)`/g, (_match, code) => {
@@ -106,9 +146,6 @@ export const NotesSection: React.FC<NotesSectionProps> = ({
       // Strikethrough (~~text~~)
       formattedText = formattedText.replace(/~~(.*?)~~/g, '<del class="structured-strikethrough">$1</del>');
 
-      // Links [text](url)
-      formattedText = formattedText.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="structured-link" target="_blank" rel="noopener noreferrer">$1</a>');
-
       return <span dangerouslySetInnerHTML={{ __html: formattedText }} />;
     };
 
@@ -116,6 +153,11 @@ export const NotesSection: React.FC<NotesSectionProps> = ({
       const line = lines[index];
       const trimmedLine = line.trim();
       const leadingSpaces = line.length - line.trimLeft().length;
+
+      // Skip standalone square brackets (just [ or ] on their own line)
+      if (trimmedLine === '[' || trimmedLine === ']') {
+        continue; // Skip this line
+      }
 
       // Table detection (dot-separated format)
       if (trimmedLine.includes(' . ') || trimmedLine.includes(' | ')) {
@@ -208,13 +250,59 @@ export const NotesSection: React.FC<NotesSectionProps> = ({
         continue;
       }
 
+      // Block math detection ($$...$$ or \[...\])
+      const blockMathMatch = trimmedLine.match(/^\$\$([^$]+)\$\$$/) || trimmedLine.match(/^\\\[([^\]]+)\\\]$/);
+      if (blockMathMatch) {
+        flushList();
+        flushTable();
+        const mathContent = blockMathMatch[1].trim();
+        elements.push(
+          <div key={`math-${index}`} className="math-block" style={{ margin: '1em 0', textAlign: 'center' }}>
+            <span className="math-display">$${mathContent}$$</span>
+          </div>
+        );
+        continue;
+      }
+
+      // Check if line is a standalone math expression (possibly in square brackets)
+      if (isStandaloneMathLine(trimmedLine)) {
+        flushList();
+        flushTable();
+        // Process the line to remove brackets and format as block math
+        let processedLine = processMathExpressions(trimmedLine);
+        
+        // Ensure it's in block math format
+        if (!processedLine.trim().startsWith('$$')) {
+          // Extract math content (remove any remaining formatting)
+          const mathMatch = processedLine.match(/\$\$([^$]+)\$\$/) || processedLine.match(/\\\(([^\)]+)\\\)/);
+          if (mathMatch) {
+            processedLine = `$$${mathMatch[1].trim()}$$`;
+          } else {
+            // If no math delimiters, wrap the whole thing
+            processedLine = `$$${processedLine.trim()}$$`;
+          }
+        }
+        
+        // Extract just the math content for display
+        const mathContentMatch = processedLine.match(/\$\$([^$]+)\$\$/);
+        const mathContent = mathContentMatch ? mathContentMatch[1].trim() : processedLine.replace(/\$\$/g, '').trim();
+        
+        elements.push(
+          <div key={`math-block-${index}`} className="math-block" style={{ margin: '1em 0', textAlign: 'center' }}>
+            <span className="math-display">$${mathContent}$$</span>
+          </div>
+        );
+        continue;
+      }
+
       // Regular paragraphs (if not in a list or table)
       if (!inList && !inTable) {
         flushList();
         flushTable();
+        const processedLine = processMathExpressions(trimmedLine);
         elements.push(
           <p key={`para-${index}`} className="structured-paragraph">
-            {parseInlineFormatting(trimmedLine)}
+            {parseInlineFormatting(processedLine)}
           </p>
         );
       }

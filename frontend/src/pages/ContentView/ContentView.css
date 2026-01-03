@@ -534,10 +534,10 @@ body {
 }
 
 .notes-container.centered-content {
-  text-align: left;
+  text-align: center;
   width: 100%;
-  justify-content: flex-start; /* Align content to left instead of center */
-  align-items: flex-start; /* Align items to left */
+  justify-content: center; /* Center content horizontally */
+  align-items: center; /* Center items vertically */
 }
 
 .play-icon {
@@ -792,7 +792,7 @@ body {
   color: var(--text-primary);
   line-height: 1.8;
   margin-bottom: 1.25rem;
-  text-align: left;
+  text-align: center;
   width: 100%;
   font-size: 1.05rem;
   word-wrap: break-word;
@@ -817,7 +817,7 @@ body {
   font-size: 1.05rem;
   position: relative;
   padding-left: 1.5rem; /* Add space for bullet point */
-  text-align: left;
+  text-align: center;
 }
 
 .structured-list-item::before {
@@ -847,7 +847,7 @@ body {
   color: var(--text-primary);
   line-height: 1.8;
   margin-bottom: 0.75rem;
-  text-align: left;
+  text-align: center;
   width: 100%;
   font-size: 1.05rem;
   word-wrap: break-word;
@@ -952,6 +952,7 @@ body {
   color: var(--text-secondary);
   line-height: 1.6;
   position: relative;
+  text-align: center;
 }
 
 .structured-blockquote::before {
@@ -1053,7 +1054,6 @@ body {
 }
 
 .markdown-link:hover {
-  text-decoration: underline;
   opacity: 0.8;
 }
 
@@ -1586,9 +1586,9 @@ body {
 
 .qa-widget-question {
   display: flex;
-  align-items: flex-start;
+  align-items: center; /* Changed from flex-start to center for proper alignment */
   justify-content: space-between;
-  padding: 20px;
+  padding: 20px; /* Added consistent padding */
   cursor: pointer;
   background: var(--card-background);
   border: 1px solid var(--border-subtle);
@@ -1613,9 +1613,10 @@ body {
 
 .question-content {
   display: flex;
-  align-items: flex-start;
+  align-items: center; /* Align with parent container */
   flex: 1;
   gap: 8px;
+  padding: 0; /* Remove padding since parent now has it */
 }
 
 .question-text {
@@ -1629,9 +1630,20 @@ body {
   white-space: pre-wrap; /* Preserve newlines */
 }
 
+.question-content .notes-container {
+  padding: 0; /* No extra padding for questions */
+}
+
+.question-content .notes-container .notes-structured {
+  padding: 0; /* No padding for inline questions */
+  margin: 0;
+  max-width: none;
+  display: inline; /* Keep questions inline */
+}
+
 .dropdown-arrow {
   color: var(--text-secondary);
-  margin-left: 16px;
+  margin-left: auto; /* Push to the right */
   flex-shrink: 0;
   transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   width: 18px;
@@ -1645,7 +1657,7 @@ body {
 }
 
 .qa-widget-answer {
-  padding: 20px;
+  padding: 0;
   background: rgba(0, 0, 0, 0.08);
   border: 1px solid var(--border-subtle);
   border-top: none;
@@ -1727,15 +1739,16 @@ body {
   text-align: center;
 }
 
-.answer-content {
-  color: var(--text-primary);
-  line-height: 1.7;
-  font-size: 1.05rem;
-  word-wrap: break-word;
-  hyphens: auto;
-  text-align: left;
-  width: 100%;
-  white-space: pre-wrap; /* Preserve newlines */
+/* .answer-content styles removed - now using .notes-container structure */
+
+.qa-widget-answer .notes-container {
+  padding: 20px; /* Add padding to maintain visual spacing */
+}
+
+.qa-widget-answer .notes-container .notes-structured {
+  padding: 0 32px; /* Same padding as main text section */
+  margin: 0 auto;
+  max-width: 900px;
 }
 
 /* ===== Section Header with Delete Button ===== */

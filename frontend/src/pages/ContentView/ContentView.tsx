@@ -11,6 +11,27 @@ import { createCourse, deleteCourse } from "../../api/courses";
 import { createTopic, deleteTopic } from "../../api/topics";
 import { createSubtopic, deleteSubtopic, createSubtopicContent, getSubtopicContent, deleteSubtopicContent } from "../../api/subtopics";
 import "./ContentView.css";
+import { processMathExpressions, isStandaloneMathLine } from "../../utils/mathProcessor";
+import { convertLatexToUnicode } from "../../utils/latexToUnicode";
+import { MarkdownRenderer } from "../../components/MarkdownRenderer/MarkdownRenderer";
+
+// Initialize MathJax
+declare global {
+  interface Window {
+    MathJax?: {
+      typesetPromise: (elements?: HTMLElement[]) => Promise<void>;
+      startup: {
+        ready: () => void;
+      };
+      config: {
+        tex: {
+          inlineMath: string[][];
+          displayMath: string[][];
+        };
+      };
+    };
+  }
+}
 
 
 interface ContentViewProps {
@@ -65,6 +86,41 @@ const ContentView: React.FC<ContentViewProps> = ({
       console.warn('Error saving mode to localStorage:', error);
     }
   }, [mode]);
+
+  // Initialize MathJax
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = 'https://polyfill.io/v3/polyfill.min.js?features=es6';
+    script.async = true;
+    document.head.appendChild(script);
+
+    const mathJaxScript = document.createElement('script');
+    mathJaxScript.id = 'MathJax-script';
+    mathJaxScript.src = 'https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js';
+    mathJaxScript.async = true;
+    mathJaxScript.onload = () => {
+      if (window.MathJax) {
+        (window.MathJax.config as any) = {
+          tex: {
+            inlineMath: [['\\(', '\\)'], ['$', '$']],
+            displayMath: [['\\[', '\\]'], ['$$', '$$']],
+            processEscapes: true,
+            processEnvironments: true
+          }
+        };
+        window.MathJax.startup.ready();
+      }
+    };
+    document.head.appendChild(mathJaxScript);
+
+    return () => {
+      // Cleanup
+      const existingScript = document.getElementById('MathJax-script');
+      if (existingScript) {
+        existingScript.remove();
+      }
+    };
+  }, []);
   const { selectedSubtopic, hierarchy, selectedCourse, selectedTopic, courses, topics, subtopics, setSelectedCourse, setSelectedTopic, setSelectedSubtopic, loadTopics, loadSubtopics, loadContent, loadCourses, setHierarchy, clearTopicCache, clearSubtopicCache } = useHierarchy();
 
   // Debug logging for topics state (only in development)
@@ -80,6 +136,18 @@ const ContentView: React.FC<ContentViewProps> = ({
   }, [topics]);
   const { isAdmin } = useAuth();
   const [contentData, setContentData] = useState<any>(null);
+
+  // Re-render MathJax when content changes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (window.MathJax) {
+        window.MathJax.typesetPromise().catch((err: Error) => {
+          console.warn('MathJax typeset error:', err);
+        });
+      }
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [contentData]);
   const [isLoadingCourses, setIsLoadingCourses] = useState(false);
   const [isLoadingTopics, setIsLoadingTopics] = useState(false);
   const [isLoadingSubtopics, setIsLoadingSubtopics] = useState(false);
@@ -100,7 +168,8 @@ const ContentView: React.FC<ContentViewProps> = ({
     contentType: 'notes',
     title: '',
     content: '',
-    resourceType: 'ppt' // 'pdf' or 'ppt'
+    resourceType: 'ppt', // 'pdf' or 'ppt'
+    contentFormat: 'normal' // 'normal', 'math', or 'code'
   });
   const [addResourceStatus, setAddResourceStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [adminFormData, setAdminFormData] = useState({
@@ -188,7 +257,7 @@ const ContentView: React.FC<ContentViewProps> = ({
       setTimeout(() => {
         setAddResourceStatus('idle');
         // Clear form data
-        setContentAddFormData({ contentType: 'drive', title: '', content: '', resourceType: 'ppt' });
+        setContentAddFormData({ contentType: 'drive', title: '', content: '', resourceType: 'ppt', contentFormat: 'normal' });
       }, 1500);
 
     } catch (error) {
@@ -292,8 +361,6 @@ const ContentView: React.FC<ContentViewProps> = ({
   }, []);
 
   const notesRef = useRef<HTMLDivElement>(null);
-  const [showToolbar, setShowToolbar] = useState(false);
-  const [toolbarPos, setToolbarPos] = useState({ x: 0, y: 0 });
 
   // Ensure hierarchy is loaded from localStorage if context doesn't have it
   useEffect(() => {
@@ -633,33 +700,16 @@ const ContentView: React.FC<ContentViewProps> = ({
           document.activeElement.blur();
         }
 
-        // If highlight toolbar is visible, undo the last highlight instead of toggling sidebar
-        if (showToolbar) {
-          undoLastHighlight();
-        } else {
-          setSidebarCollapsed(!sidebarCollapsed);
-        }
+        // Toggle sidebar
+        setSidebarCollapsed(!sidebarCollapsed);
       }
     };
 
     // Use document event listener with capture to work even when focused in iframes
     document.addEventListener('keydown', handleKeyDown, { capture: true });
     return () => document.removeEventListener('keydown', handleKeyDown, { capture: true });
-  }, [sidebarCollapsed, showToolbar]);
+  }, [sidebarCollapsed]);
 
-  // Undo last highlight functionality
-  const undoLastHighlight = () => {
-    const highlights = document.querySelectorAll('.user-highlight');
-    if (highlights.length > 0) {
-      const lastHighlight = highlights[highlights.length - 1] as HTMLElement;
-      const parent = lastHighlight.parentNode!;
-      while (lastHighlight.firstChild) {
-        parent.insertBefore(lastHighlight.firstChild, lastHighlight);
-      }
-      parent.removeChild(lastHighlight);
-      setShowToolbar(false);
-    }
-  };
 
   const handleNavigate = (path: string) => {
     if (path === "/login") onNavigateToLogin();
@@ -772,30 +822,17 @@ const ContentView: React.FC<ContentViewProps> = ({
     setLoadingVideos(prev => new Set(prev).add(id));
   };
 
-  // Parse and render structured text with visual elements for hierarchy
-  const parseStructuredText = (text: string, enableCodeDetection: boolean = false) => {
+  // NOTE: parseStructuredText function is deprecated - now using MarkdownRenderer for automatic Markdown + LaTeX rendering
+  // Keeping the function for parseInlineFormatting which is still used for question rendering
+  // @ts-ignore - Function kept for parseInlineFormatting compatibility
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const parseStructuredText = (text: string, contentFormat: string = 'normal') => {
     if (!text || text.trim() === '') {
       return [<p key="empty" className="structured-paragraph">No content available</p>];
     }
 
-
-    // If code detection is enabled, check if entire text should be treated as code
-    if (enableCodeDetection) {
-      const hasCodeContent = text.split('\n').some(line => {
-        const trimmed = line.trim();
-        // Function definitions
-        if (trimmed.match(/^(function|def|class|public|private|void|int|string|bool|const|let|var)\s+\w+/)) return true;
-        // Algorithm/pseudocode patterns
-        if (trimmed.match(/^(if|for|while|do|BEGIN|END|READ|FOR|WHILE|IF|ELSE|RETURN)\s|\w+\([^)]*\)\s*[:{]|\w+\s*\([^)]*\)\s*{/)) return true;
-        // Array access patterns
-        if (trimmed.match(/[A-Z]\[[^\]]+\]/)) return true;
-        // Assignment with code-like syntax
-        if (trimmed.match(/^\w+\s*=\s*[^=]/) && (trimmed.includes('[') || trimmed.includes('(') || trimmed.includes('{'))) return true;
-        return false;
-      });
-
-      // If text contains code patterns, render entire text as one code block
-      if (hasCodeContent) {
+    // If format is 'code', render entire text as code block
+    if (contentFormat === 'code') {
         return [
           <pre
             key="full-code-block"
@@ -807,7 +844,6 @@ const ContentView: React.FC<ContentViewProps> = ({
             </code>
           </pre>
         ];
-      }
     }
 
     // Content parsing for regular text sections
@@ -880,6 +916,11 @@ const ContentView: React.FC<ContentViewProps> = ({
     lines.forEach((line, index) => {
       const trimmedLine = line.trim();
       const leadingSpaces = line.length - line.trimLeft().length;
+
+      // Skip standalone square brackets (just [ or ] on their own line)
+      if (trimmedLine === '[' || trimmedLine === ']') {
+        return; // Skip this line
+      }
 
 
 
@@ -1062,11 +1103,88 @@ const ContentView: React.FC<ContentViewProps> = ({
         return;
       }
 
+      // Block math detection ($$...$$ or \[...\]) - only if format is 'math'
+      if (contentFormat === 'math') {
+        const blockMathMatch = trimmedLine.match(/^\$\$([^$]+)\$\$$/) || trimmedLine.match(/^\\\[([^\]]+)\\\]$/);
+        if (blockMathMatch) {
+          flushList();
+          flushTable();
+          const mathContent = blockMathMatch[1].trim();
+          elements.push(
+            <div key={`math-${index}`} className="math-block" style={{ margin: '1em 0', textAlign: 'center' }}>
+              <span className="math-display">$${mathContent}$$</span>
+            </div>
+          );
+          return;
+        }
+      }
+
+      // Check if line is a standalone math expression (possibly in square brackets)
+      if (isStandaloneMathLine(trimmedLine)) {
+        flushList();
+        flushTable();
+        
+        if (contentFormat === 'math') {
+          // For math format: use MathJax
+          let processedLine = processMathExpressions(trimmedLine, true, false);
+          
+          // Ensure it's in block math format
+          if (!processedLine.trim().startsWith('$$')) {
+            const mathMatch = processedLine.match(/\$\$([^$]+)\$\$/) || processedLine.match(/\\\(([^\)]+)\\\)/);
+            if (mathMatch) {
+              processedLine = `$$${mathMatch[1].trim()}$$`;
+            } else {
+              processedLine = `$$${processedLine.trim()}$$`;
+            }
+          }
+          
+          const mathContentMatch = processedLine.match(/\$\$([^$]+)\$\$/);
+          const mathContent = mathContentMatch ? mathContentMatch[1].trim() : processedLine.replace(/\$\$/g, '').trim();
+          
+          elements.push(
+            <div key={`math-block-${index}`} className="math-block" style={{ margin: '1em 0', textAlign: 'center' }}>
+              <span className="math-display">$${mathContent}$$</span>
+            </div>
+          );
+        } else {
+          // For normal format: remove brackets, convert LaTeX to Unicode, display as centered text
+          let processedLine = trimmedLine;
+          // Remove square brackets
+          processedLine = processedLine.replace(/\[([^\]]+)\]/g, (match, content) => {
+            const trimmed = content.trim();
+            // Check if it's a link
+            const matchIndex = processedLine.indexOf(match);
+            const afterMatch = processedLine.substring(matchIndex + match.length);
+            if (/^\s*\(/.test(afterMatch)) return match; // Keep links
+            // Remove brackets from math-like content
+            if (/[≥≤∈∉∑∏∫√\d\s=<>\\\^_\{\}\(\)]/.test(trimmed) && trimmed.length > 2) {
+              return trimmed;
+            }
+            return match;
+          });
+          // Convert LaTeX to Unicode
+          processedLine = convertLatexToUnicode(processedLine);
+          
+          elements.push(
+            <div key={`math-block-${index}`} className="math-block" style={{ margin: '1em 0', textAlign: 'center', fontFamily: 'monospace' }}>
+              {processedLine}
+            </div>
+          );
+        }
+        return;
+      }
+
       // Regular paragraphs
       flushList();
+      // Process based on format
+      let processedLine = trimmedLine;
+      if (contentFormat === 'math') {
+        processedLine = processMathExpressions(trimmedLine, true, false);
+      }
+      // For normal format, conversion happens in parseInlineFormatting
       elements.push(
         <p key={index} className="structured-paragraph">
-          {parseInlineFormatting(trimmedLine)}
+          {parseInlineFormatting(processedLine, contentFormat === 'math', contentFormat === 'normal')}
         </p>
       );
     });
@@ -1083,42 +1201,55 @@ const ContentView: React.FC<ContentViewProps> = ({
   };
 
   // Parse inline formatting like **bold** and *italic* with robust code preservation
-  const parseInlineFormatting = (text: string, preserveCode: boolean = false) => {
+
+  const parseInlineFormatting = (text: string, enableMath: boolean = false, convertToUnicode: boolean = false) => {
     if (!text) return text;
 
     let formattedText = text;
 
-    // For code preservation, skip HTML escaping to maintain exact code structure
-    if (!preserveCode) {
-      // Escape HTML entities first to prevent XSS (but preserve code)
+    // Convert LaTeX to Unicode if requested (for normal format)
+    if (convertToUnicode) {
+      formattedText = convertLatexToUnicode(formattedText);
+      // Also remove square brackets from math-like content
+      formattedText = formattedText.replace(/\[([^\]]+)\]/g, (match, content) => {
+        const trimmed = content.trim();
+        // Check if it's a link
+        const matchIndex = formattedText.indexOf(match);
+        const afterMatch = formattedText.substring(matchIndex + match.length);
+        if (/^\s*\(/.test(afterMatch)) return match; // Keep links
+        // Remove brackets from math-like content
+        if (/[≥≤∈∉∑∏∫√\d\s=<>]/.test(trimmed) && trimmed.length > 2) {
+          return trimmed; // Remove brackets
+        }
+        return match;
+      });
+    }
+
+    // Process math expressions first (before HTML escaping) - only if math is enabled
+    if (enableMath) {
+      formattedText = processMathExpressions(formattedText, true, false);
+    }
+
+    // Escape HTML entities first to prevent XSS
       formattedText = formattedText
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
-    }
 
-    // Links [text](url) - only process if not preserving code
-    if (!preserveCode) {
+    // Links [text](url) - Process before other formatting to avoid conflicts
       formattedText = formattedText.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="structured-link" target="_blank" rel="noopener noreferrer">$1</a>');
-    }
 
-    // Strikethrough (~~text~~) - only process if not preserving code
-    if (!preserveCode) {
+    // Strikethrough (~~text~~)
       formattedText = formattedText.replace(/~~(.*?)~~/g, '<span class="structured-strikethrough">$1</span>');
-    }
 
-    // Bold text (**text**) - handle multiline and nested, but skip in code
-    if (!preserveCode) {
+    // Bold text (**text**)
       formattedText = formattedText.replace(/\*\*(.*?)\*\*/g, '<span class="structured-bold">$1</span>');
-    }
 
-    // Italic text (*text* or _text_) - but avoid matching **bold** patterns, skip in code
-    if (!preserveCode) {
+    // Italic text (*text* or _text_) - but avoid matching **bold** patterns
       formattedText = formattedText.replace(/(?<!\*)\*(?!\*)([^*]+?)(?<!\*)\*(?!\*)/g, '<span class="structured-italic">$1</span>');
       formattedText = formattedText.replace(/(?<!_)_([^_]+?)_(?!_)/g, '<span class="structured-italic">$1</span>');
-    }
 
     // Inline code (`code`) - preserve code exactly
     formattedText = formattedText.replace(/`([^`\n]+)`/g, (_match, code) => {
@@ -1132,54 +1263,25 @@ const ContentView: React.FC<ContentViewProps> = ({
       return `<code class="structured-inline-code">${escapedCode}</code>`;
     });
 
-    // Handle line breaks within paragraphs - only if not preserving code
-    if (!preserveCode) {
+    // Handle line breaks within paragraphs
       formattedText = formattedText.replace(/\n/g, '<br>');
-    }
 
     // Return as dangerouslySetInnerHTML to render HTML
     return <span dangerouslySetInnerHTML={{ __html: formattedText }} />;
   };
 
-  // Render notes with structured parsing
-  const renderMarkdown = (text: string) => {
+  // Render notes with MarkdownRenderer (automatic Markdown + LaTeX rendering)
+  const renderMarkdown = (text: string, _format: string = 'normal') => {
+    if (!text || text.trim() === '') {
+      return <div className="notes-structured">No content available</div>;
+    }
     return (
       <div className="notes-structured">
-        {parseStructuredText(text)}
+        <MarkdownRenderer content={text} />
       </div>
     );
   };
 
-  const handleSelection = () => {
-    const selection = window.getSelection();
-    if (!selection || selection.toString().trim() === "") { setShowToolbar(false); return; }
-    const range = selection.getRangeAt(0);
-    if (notesRef.current && !notesRef.current.contains(range.commonAncestorContainer)) { setShowToolbar(false); return; }
-    const rect = range.getBoundingClientRect();
-    setToolbarPos({ x: rect.left + rect.width / 2, y: rect.top - 40 });
-    setShowToolbar(true);
-  };
-
-  const applyHighlight = () => {
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0) return;
-    const range = selection.getRangeAt(0);
-    if (range.commonAncestorContainer.parentElement?.tagName === "MARK") { setShowToolbar(false); return; }
-    const mark = document.createElement("mark");
-    mark.className = "user-highlight";
-    range.surroundContents(mark);
-    selection.removeAllRanges();
-    setShowToolbar(false);
-  };
-
-  const removeHighlight = (e: React.MouseEvent) => {
-    const target = e.target as HTMLElement;
-    if (target.tagName === "MARK") {
-      const parent = target.parentNode!;
-      while (target.firstChild) parent.insertBefore(target.firstChild, target);
-      parent.removeChild(target);
-    }
-  };
 
   const sectionsOrder = () => {
     // Conditional sections based on mode
@@ -1380,7 +1482,7 @@ const ContentView: React.FC<ContentViewProps> = ({
                     className="content-add-btn"
                     onClick={() => {
                       setShowContentAddForm({ section: 'featuredVideo', visible: true });
-                      setContentAddFormData({ contentType: 'video', title: '', content: '', resourceType: '' });
+                      setContentAddFormData({ contentType: 'video', title: '', content: '', resourceType: '', contentFormat: 'normal' });
                     }}
                   >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1629,7 +1731,7 @@ const ContentView: React.FC<ContentViewProps> = ({
                       className={`content-add-btn ${addResourceStatus === 'success' ? 'success' : addResourceStatus === 'error' ? 'error' : ''}`}
                       onClick={() => {
                         setShowContentAddForm({ section: 'driveResources', visible: true });
-                        setContentAddFormData({ contentType: 'drive', title: '', content: '', resourceType: 'ppt' });
+                        setContentAddFormData({ contentType: 'drive', title: '', content: '', resourceType: 'ppt', contentFormat: 'normal' });
                         setAddResourceStatus('idle'); // Reset status when opening form
                       }}
                       disabled={addResourceStatus === 'loading'}
@@ -1771,7 +1873,7 @@ const ContentView: React.FC<ContentViewProps> = ({
                 </button>
               )}
             </div>
-            <div className="notes-container centered-content" ref={notesRef} onMouseUp={handleSelection} onClick={removeHighlight}>
+            <div className="notes-container centered-content" ref={notesRef}>
               {contentData.notesItems && contentData.notesItems.length > 0 ? (
                 contentData.notesItems.map((noteItem: any) => (
                   <div key={noteItem.id} className="note-item-wrapper">
@@ -1794,14 +1896,13 @@ const ContentView: React.FC<ContentViewProps> = ({
                         </svg>
                       </button>
                     )}
-                    <div className="note-content">{renderMarkdown(noteItem.content)}</div>
+                    <div className="note-content">{renderMarkdown(noteItem.content, noteItem.metadata?.format || 'normal')}</div>
                   </div>
                 ))
               ) : (
-                renderMarkdown(contentData.notes || '')
+                renderMarkdown(contentData.notes || '', contentData.notesMetadata?.format || 'normal')
               )}
             </div>
-            {showToolbar && <div className="highlight-toolbar" style={{ left: toolbarPos.x, top: toolbarPos.y }}><button onClick={applyHighlight}>Highlight</button></div>}
 
             {/* Add Content Button for Admin - always show for admins */}
             {isAdmin && (
@@ -1811,7 +1912,7 @@ const ContentView: React.FC<ContentViewProps> = ({
                     className="content-add-btn"
                     onClick={() => {
                       setShowContentAddForm({ section: 'notes', visible: true });
-                      setContentAddFormData({ contentType: 'notes', title: '', content: '', resourceType: '' });
+                      setContentAddFormData({ contentType: 'notes', title: '', content: '', resourceType: '', contentFormat: 'normal' });
                     }}
                   >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1836,6 +1937,18 @@ const ContentView: React.FC<ContentViewProps> = ({
                         className="content-form-textarea"
                         rows={4}
                       />
+                      <div className="content-format-selector">
+                        <label>Content Format:</label>
+                        <select
+                          value={contentAddFormData.contentFormat}
+                          onChange={(e) => setContentAddFormData({...contentAddFormData, contentFormat: e.target.value as 'normal' | 'math' | 'code'})}
+                          className="content-form-select"
+                        >
+                          <option value="normal">Normal (ChatGPT-style formatting)</option>
+                          <option value="math">Math (LaTeX/MathJax rendering)</option>
+                          <option value="code">Code/Algorithm</option>
+                        </select>
+                      </div>
                     </div>
                     <div className="add-form-buttons">
                       <button
@@ -1847,7 +1960,8 @@ const ContentView: React.FC<ContentViewProps> = ({
                                 contentType: 'notes',
                                 contentOrder: 1,
                                 title: contentAddFormData.title,
-                                content: contentAddFormData.content
+                                content: contentAddFormData.content,
+                                metadata: { format: contentAddFormData.contentFormat }
                               });
                               // Refresh content
                               loadContentData();
@@ -1936,7 +2050,9 @@ const ContentView: React.FC<ContentViewProps> = ({
                         <div className="question-content">
                           <span className="question-number">{index + 1}.</span>
                           <span className="question-text">
-                            {parseInlineFormatting(q.question)}
+                            <div className="notes-container">
+                              {renderMarkdown(q.question)}
+                            </div>
                           </span>
                         </div>
                         <svg
@@ -1954,8 +2070,8 @@ const ContentView: React.FC<ContentViewProps> = ({
                         </svg>
                       </summary>
                       <div className="qa-widget-answer">
-                        <div className="answer-content">
-                          {parseStructuredText(q.answer, true)}
+                        <div className="notes-container">
+                          {renderMarkdown(q.answer)}
                         </div>
                       </div>
                     </details>
@@ -1971,7 +2087,7 @@ const ContentView: React.FC<ContentViewProps> = ({
                       className="content-add-btn"
                       onClick={() => {
                         setShowContentAddForm({ section: 'questions', visible: true });
-                        setContentAddFormData({ contentType: 'question', title: '', content: '', resourceType: '' });
+                        setContentAddFormData({ contentType: 'question', title: '', content: '', resourceType: '', contentFormat: 'normal' });
                       }}
                     >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1998,6 +2114,18 @@ const ContentView: React.FC<ContentViewProps> = ({
                           className="content-form-textarea"
                           rows={4}
                         />
+                        <div className="content-format-selector">
+                          <label>Content Format:</label>
+                          <select
+                            value={contentAddFormData.contentFormat}
+                            onChange={(e) => setContentAddFormData({...contentAddFormData, contentFormat: e.target.value as 'normal' | 'math' | 'code'})}
+                            className="content-form-select"
+                          >
+                            <option value="normal">Normal (ChatGPT-style formatting)</option>
+                            <option value="math">Math (LaTeX/MathJax rendering)</option>
+                            <option value="code">Code/Algorithm</option>
+                          </select>
+                        </div>
                       </div>
                       <div className="add-form-buttons">
                         <button
@@ -2010,7 +2138,10 @@ const ContentView: React.FC<ContentViewProps> = ({
                                   contentOrder: 1,
                                   title: contentAddFormData.title, // Question goes in title
                                   content: '', // Empty content
-                                  metadata: { answer: contentAddFormData.content } // Answer goes in metadata
+                                  metadata: { 
+                                    answer: contentAddFormData.content,
+                                    format: contentAddFormData.contentFormat
+                                  } // Answer and format go in metadata
                                 });
                                 // Refresh content
                                 loadContentData();

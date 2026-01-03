@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: (import.meta.env.VITE_API_BASE as string) || "https://smithsonian-andrews-approximately-madrid.trycloudflare.com/api", // your backend URL
+  baseURL: (import.meta.env.VITE_API_BASE as string) || "https://spoonfeeders-backend.vercel.app/api", // Vercel backend URL
   headers: {
     "Content-Type": "application/json",
   },

@@ -8,7 +8,7 @@ interface SettingsDropdownProps {
 }
 
 export default function SettingsDropdown({ onSave }: SettingsDropdownProps) {
-    const BASE_BACKEND_URL = (import.meta.env.VITE_API_BASE as string) || "https://smithsonian-andrews-approximately-madrid.trycloudflare.com/api";
+    const BASE_BACKEND_URL = (import.meta.env.VITE_API_BASE as string) || "https://spoonfeeders-backend.vercel.app/api";
     const [open, setOpen] = useState(true);
     const [collegesData, setCollegesData] = useState<any[]>([]);
     const [departmentsData, setDepartmentsData] = useState<any[]>([]);
