@@ -34,7 +34,7 @@ const registerSchema = Joi.object({
   }),
   password: Joi.string()
     .min(8)
-    .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
+    .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/)
     .required()
     .messages({
       'string.min': 'Password must be at least 8 characters long',
@@ -195,7 +195,7 @@ export const resetPassword = async (req: Request, res: Response) => {
         // Validate password strength
         const passwordSchema = Joi.string()
             .min(8)
-            .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
+            .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/)
             .required()
             .messages({
                 'string.min': 'Password must be at least 8 characters long',
