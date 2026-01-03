@@ -185,7 +185,7 @@ const fixLeftRightDelimiters = (text: string): string => {
       }
     } else if (rightCount > leftCount) {
       // Remove extra \right delimiters (simplified approach)
-      fixed = fixed.replace(/\\right[^a-zA-Z]/g, (match) => {
+      fixed = fixed.replace(/\\right[^a-zA-Z]/g, (match: string) => {
         rightCount > leftCount ? '' : match;
       });
     }
