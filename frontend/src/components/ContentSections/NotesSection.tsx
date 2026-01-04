@@ -257,7 +257,7 @@ export const NotesSection: React.FC<NotesSectionProps> = ({
         flushTable();
         const mathContent = blockMathMatch[1].trim();
         elements.push(
-          <div key={`math-${index}`} className="math-block" style={{ margin: '1em 0', textAlign: 'center' }}>
+          <div key={`math-${index}`} className="math-block" style={{ margin: '1em 0', textAlign: 'left' }}>
             <span className="math-display">$${mathContent}$$</span>
           </div>
         );
@@ -288,7 +288,7 @@ export const NotesSection: React.FC<NotesSectionProps> = ({
         const mathContent = mathContentMatch ? mathContentMatch[1].trim() : processedLine.replace(/\$\$/g, '').trim();
         
         elements.push(
-          <div key={`math-block-${index}`} className="math-block" style={{ margin: '1em 0', textAlign: 'center' }}>
+          <div key={`math-block-${index}`} className="math-block" style={{ margin: '1em 0', textAlign: 'left' }}>
             <span className="math-display">$${mathContent}$$</span>
           </div>
         );
