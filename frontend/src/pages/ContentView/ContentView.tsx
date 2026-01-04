@@ -48,11 +48,15 @@ const ContentView: React.FC<ContentViewProps> = ({
   onFullscreenToggle
 }) => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [isMobileSideBarOpen, setIsMobileSideBarOpen] = useState(false);
   const [playingVideos, setPlayingVideos] = useState<{ [key: string]: boolean }>({});
   const [loadingVideos, setLoadingVideos] = useState<Set<string>>(new Set());
   const [openResources, setOpenResources] = useState<Set<number>>(new Set());
   const [fullscreenResource, setFullscreenResource] = useState<number | null>(null);
   const [loadingResources, setLoadingResources] = useState<Set<number>>(new Set());
+
+
   // Load saved mode from localStorage or default to "normal"
   const getSavedMode = (): "deep" | "normal" | "rush" => {
     try {
@@ -121,6 +125,16 @@ const ContentView: React.FC<ContentViewProps> = ({
       }
     };
   }, []);
+  //mobile detection
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   const { selectedSubtopic, hierarchy, selectedCourse, selectedTopic, courses, topics, subtopics, setSelectedCourse, setSelectedTopic, setSelectedSubtopic, loadTopics, loadSubtopics, loadContent, loadCourses, setHierarchy, clearTopicCache, clearSubtopicCache } = useHierarchy();
 
   // Debug logging for topics state (only in development)
@@ -579,7 +593,8 @@ const ContentView: React.FC<ContentViewProps> = ({
           contentMap.questions.push({
             id: item.id, // Store backend ID for deletion
             question: item.title || item.content || 'Question',
-            answer: item.metadata?.answer || item.metadata?.Answer || 'Answer not available'
+            answer: item.metadata?.answer || item.metadata?.Answer || 'Answer not available',
+            metadata: item.metadata // Include metadata for format information
           });
           break;
       }
@@ -597,7 +612,13 @@ const ContentView: React.FC<ContentViewProps> = ({
   };
 
 
-  const handleMenuToggle = () => setSidebarCollapsed(!sidebarCollapsed);
+  const handleMenuToggle = () => {
+    if(isMobile) {
+      setIsMobileSideBarOpen(!isMobileSideBarOpen);
+    } else {
+      setSidebarCollapsed(!sidebarCollapsed);
+    }
+  };
 
   const handleFullscreenToggle = () => {
     if (!isFullscreen) {
@@ -831,17 +852,28 @@ const ContentView: React.FC<ContentViewProps> = ({
       return [<p key="empty" className="structured-paragraph">No content available</p>];
     }
 
-    // If format is 'code', render entire text as code block
+    // CODE FORMAT: Display EXACT input with NO processing, NO structuring, NO parsing
     if (contentFormat === 'code') {
         return [
           <pre
-            key="full-code-block"
-            className="structured-code-block"
-            data-language="text"
+            key="raw-code-display"
+            style={{
+              whiteSpace: 'pre',
+              background: '#1e1e1e',
+              color: '#d4d4d4',
+              padding: '16px',
+              borderRadius: '8px',
+              border: '1px solid #333',
+              fontFamily: 'monospace',
+              fontSize: '14px',
+              lineHeight: '1.4',
+              margin: '1rem 0',
+              overflowX: 'auto',
+              display: 'block',
+              width: '100%'
+            }}
           >
-            <code className="language-text">
-              {text}
-            </code>
+            {text}
           </pre>
         ];
     }
@@ -1111,7 +1143,7 @@ const ContentView: React.FC<ContentViewProps> = ({
           flushTable();
           const mathContent = blockMathMatch[1].trim();
           elements.push(
-            <div key={`math-${index}`} className="math-block" style={{ margin: '1em 0', textAlign: 'center' }}>
+            <div key={`math-${index}`} className="math-block" style={{ margin: '1em 0', textAlign: 'left' }}>
               <span className="math-display">$${mathContent}$$</span>
             </div>
           );
@@ -1142,7 +1174,7 @@ const ContentView: React.FC<ContentViewProps> = ({
           const mathContent = mathContentMatch ? mathContentMatch[1].trim() : processedLine.replace(/\$\$/g, '').trim();
           
           elements.push(
-            <div key={`math-block-${index}`} className="math-block" style={{ margin: '1em 0', textAlign: 'center' }}>
+            <div key={`math-block-${index}`} className="math-block" style={{ margin: '1em 0', textAlign: 'left' }}>
               <span className="math-display">$${mathContent}$$</span>
             </div>
           );
@@ -1270,16 +1302,26 @@ const ContentView: React.FC<ContentViewProps> = ({
     return <span dangerouslySetInnerHTML={{ __html: formattedText }} />;
   };
 
-  // Render notes with MarkdownRenderer (automatic Markdown + LaTeX rendering)
-  const renderMarkdown = (text: string, _format: string = 'normal') => {
+  // Render content based on format
+  const renderMarkdown = (text: string, format: string = 'normal') => {
     if (!text || text.trim() === '') {
       return <div className="notes-structured">No content available</div>;
     }
-    return (
-      <div className="notes-structured">
-        <MarkdownRenderer content={text} />
-      </div>
-    );
+
+    if (format === 'math') {
+      return (
+        <div className="notes-structured">
+          <MarkdownRenderer content={text} />
+        </div>
+      );
+    } else {
+      // For 'normal' and 'code' formats, use parseStructuredText
+      return (
+        <div className="notes-structured">
+          {parseStructuredText(text, format)}
+        </div>
+      );
+    }
   };
 
 
@@ -1956,11 +1998,14 @@ const ContentView: React.FC<ContentViewProps> = ({
                         onClick={async () => {
                           if (selectedSubtopic) {
                             try {
+                              // For code format, content is handled specially by renderer
+                              const processedContent = contentAddFormData.content;
+
                               await createSubtopicContent(parseInt(selectedSubtopic.id), {
                                 contentType: 'notes',
                                 contentOrder: 1,
                                 title: contentAddFormData.title,
-                                content: contentAddFormData.content,
+                                content: processedContent,
                                 metadata: { format: contentAddFormData.contentFormat }
                               });
                               // Refresh content
@@ -2051,7 +2096,7 @@ const ContentView: React.FC<ContentViewProps> = ({
                           <span className="question-number">{index + 1}.</span>
                           <span className="question-text">
                             <div className="notes-container">
-                              {renderMarkdown(q.question)}
+                              {renderMarkdown(q.question, 'normal')}
                             </div>
                           </span>
                         </div>
@@ -2071,7 +2116,7 @@ const ContentView: React.FC<ContentViewProps> = ({
                       </summary>
                       <div className="qa-widget-answer">
                         <div className="notes-container">
-                          {renderMarkdown(q.answer)}
+                          {renderMarkdown(q.answer, q.metadata?.format || 'normal')}
                         </div>
                       </div>
                     </details>
@@ -2133,13 +2178,16 @@ const ContentView: React.FC<ContentViewProps> = ({
                           onClick={async () => {
                             if (selectedSubtopic) {
                               try {
+                                // For code format, answer is handled specially by renderer
+                                const processedAnswer = contentAddFormData.content;
+
                                 await createSubtopicContent(parseInt(selectedSubtopic.id), {
                                   contentType: 'question', // Backend expects 'question' not 'questions'
                                   contentOrder: 1,
                                   title: contentAddFormData.title, // Question goes in title
                                   content: '', // Empty content
-                                  metadata: { 
-                                    answer: contentAddFormData.content,
+                                  metadata: {
+                                    answer: processedAnswer,
                                     format: contentAddFormData.contentFormat
                                   } // Answer and format go in metadata
                                 });

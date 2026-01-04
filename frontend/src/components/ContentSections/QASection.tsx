@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { processMathExpressions, isStandaloneMathLine } from '../../utils/mathProcessor';
 import { convertLatexToUnicode } from '../../utils/latexToUnicode';
+import { MarkdownRenderer } from '../MarkdownRenderer/MarkdownRenderer';
 
 declare global {
   interface Window {
@@ -60,19 +61,30 @@ export const QASection: React.FC<QASectionProps> = ({
       return [<p key="empty" className="structured-paragraph">No content available</p>];
     }
 
-    // If format is 'code', render entire text as code block
+    // CODE FORMAT: Display EXACT input with NO processing, NO structuring, NO parsing
     if (contentFormat === 'code') {
-      return [
-        <pre
-          key="full-code-block"
-          className="structured-code-block"
-          data-language="text"
-        >
-          <code className="language-text">
+        return [
+          <pre
+            key="raw-code-display"
+            style={{
+              whiteSpace: 'pre',
+              background: '#1e1e1e',
+              color: '#d4d4d4',
+              padding: '16px',
+              borderRadius: '8px',
+              border: '1px solid #333',
+              fontFamily: 'monospace',
+              fontSize: '14px',
+              lineHeight: '1.4',
+              margin: '1rem 0',
+              overflowX: 'auto',
+              display: 'block',
+              width: '100%'
+            }}
+          >
             {text}
-          </code>
-        </pre>
-      ];
+          </pre>
+        ];
     }
 
     // Content parsing for regular text sections
@@ -310,7 +322,7 @@ export const QASection: React.FC<QASectionProps> = ({
         flushTable();
         const mathContent = blockMathMatch[1].trim();
         elements.push(
-          <div key={`math-${index}`} className="math-block" style={{ margin: '1em 0', textAlign: 'center' }}>
+          <div key={`math-${index}`} className="math-block" style={{ margin: '1em 0', textAlign: 'left' }}>
             <span className="math-display">$${mathContent}$$</span>
           </div>
         );
@@ -340,7 +352,7 @@ export const QASection: React.FC<QASectionProps> = ({
           const mathContent = mathContentMatch ? mathContentMatch[1].trim() : processedLine.replace(/\$\$/g, '').trim();
           
           elements.push(
-            <div key={`math-block-${index}`} className="math-block" style={{ margin: '1em 0', textAlign: 'center' }}>
+            <div key={`math-block-${index}`} className="math-block" style={{ margin: '1em 0', textAlign: 'left' }}>
               <span className="math-display">$${mathContent}$$</span>
             </div>
           );
@@ -464,7 +476,11 @@ export const QASection: React.FC<QASectionProps> = ({
             </summary>
             <div className="qa-widget-answer">
               <div className="answer-content">
-                {parseStructuredText(q.answer, q.metadata?.format || 'normal')}
+                {q.metadata?.format === 'math' ? (
+                  <MarkdownRenderer content={q.answer} />
+                ) : (
+                  parseStructuredText(q.answer, q.metadata?.format || 'normal')
+                )}
               </div>
             </div>
           </details>
