@@ -1,5 +1,5 @@
 import { Request,Response } from "express";
-import pool from "../db/connection";
+import pool, { queryWithTimeout } from "../db/connection";
 
 export const getSubtopicContent = async (_req:Request,res:Response)=>{
     try{
@@ -9,9 +9,11 @@ export const getSubtopicContent = async (_req:Request,res:Response)=>{
             return res.status(400).json({error:"Invalid subtopic id"});
         }
 
-        const result = await pool.query(
+        const result = await queryWithTimeout(
             'SELECT id, subtopic_id as "subtopicId", content_type as "contentType",content_order as "contentOrder", parent_content_id as "parentContentId",title, content, metadata , created_at FROM subtopic_content WHERE subtopic_id = $1 ORDER BY content_order ASC',
-            [subtopicId]
+            [subtopicId],
+            10000, // 10s timeout
+            2 // 2 retries
         );
 
         res.json(result.rows);
@@ -37,9 +39,11 @@ export const addSubtopicContent = async (_req:Request,res:Response)=>{
             return res.status(400).json({error:"contentType and contentOrder are required"});
         }
 
-        const result = await pool.query(
+        const result = await queryWithTimeout(
             'INSERT INTO subtopic_content (subtopic_id, content_type, content_order, parent_content_id, title, content, metadata) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id, subtopic_id as "subtopicId", content_type as "contentType", content_order as "contentOrder", parent_content_id as "parentContentId", title, content, metadata',
-            [subtopicId, contentType, contentOrder, parentContentId, title, content, metadata]
+            [subtopicId, contentType, contentOrder, parentContentId, title, content, metadata],
+            15000, // 15s timeout for INSERT operations
+            3 // 3 retries for critical operations
         );
 
         res.status(201).json(result.rows[0]);
@@ -57,9 +61,11 @@ export const deleteSubtopicContent = async(req: Request, res: Response) => {
       return res.status(400).json({ error: "Content ID is required" });
     }
 
-    const result = await pool.query(
+    const result = await queryWithTimeout(
       "DELETE FROM subtopic_content WHERE id = $1 RETURNING id, title",
-      [id]
+      [id],
+      10000, // 10s timeout
+      2 // 2 retries
     );
 
     if (result.rows.length === 0) {

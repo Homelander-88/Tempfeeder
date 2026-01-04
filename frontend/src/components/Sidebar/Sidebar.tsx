@@ -198,7 +198,13 @@ const Sidebar: React.FC<SidebarProps> = ({
                       className="nav-delete-btn"
                       onClick={(e) => {
                         e.stopPropagation();
-                        onDeleteItem(item);
+                        const itemType = mode === 'courses' ? 'course' : mode === 'topics' ? 'topic' : 'subtopic';
+                        const confirmed = window.confirm(
+                          `Are you sure you want to delete this ${itemType}?\n\n"${item.label}"\n\nThis action cannot be undone and will also delete all related content.`
+                        );
+                        if (confirmed) {
+                          onDeleteItem(item);
+                        }
                       }}
                       title="Delete item"
                     >

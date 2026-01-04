@@ -742,11 +742,11 @@ body {
   line-height: 1.8;
   font-size: 1.05rem;
   width: 100%;
-  max-width: 900px; /* Limit max width for readability */
-  margin: 0 auto; /* Center the container horizontally */
+  max-width: none; /* Use full available width */
+  margin: 0; /* Remove centering margins */
   text-align: left;
-  padding: 0 32px; /* Consistent left/right padding */
-  display: block; /* Ensure it's a block element for centering */
+  padding: 0 16px; /* Minimal padding for readability */
+  display: block;
 }
 
 .structured-heading {
@@ -792,11 +792,12 @@ body {
   color: var(--text-primary);
   line-height: 1.8;
   margin-bottom: 1.25rem;
-  text-align: center;
+  text-align: left;
   width: 100%;
   font-size: 1.05rem;
   word-wrap: break-word;
   hyphens: auto;
+  box-sizing: border-box;
 }
 
 .structured-list {
@@ -807,6 +808,7 @@ body {
   width: 100%;
   font-size: 1.05rem;
   list-style: none; /* Remove default bullets */
+  box-sizing: border-box;
 }
 
 .structured-list-item {
@@ -817,7 +819,8 @@ body {
   font-size: 1.05rem;
   position: relative;
   padding-left: 1.5rem; /* Add space for bullet point */
-  text-align: center;
+  text-align: left;
+  box-sizing: border-box;
 }
 
 .structured-list-item::before {
@@ -847,7 +850,7 @@ body {
   color: var(--text-primary);
   line-height: 1.8;
   margin-bottom: 0.75rem;
-  text-align: center;
+  text-align: left;
   width: 100%;
   font-size: 1.05rem;
   word-wrap: break-word;
@@ -952,7 +955,7 @@ body {
   color: var(--text-secondary);
   line-height: 1.6;
   position: relative;
-  text-align: center;
+  text-align: left;
 }
 
 .structured-blockquote::before {
@@ -1639,6 +1642,7 @@ body {
   margin: 0;
   max-width: none;
   display: inline; /* Keep questions inline */
+  width: 100%;
 }
 
 .dropdown-arrow {
@@ -1746,9 +1750,10 @@ body {
 }
 
 .qa-widget-answer .notes-container .notes-structured {
-  padding: 0 32px; /* Same padding as main text section */
-  margin: 0 auto;
-  max-width: 900px;
+  padding: 0 16px; /* Minimal padding for full width usage */
+  margin: 0;
+  max-width: none;
+  width: 100%;
 }
 
 /* ===== Section Header with Delete Button ===== */

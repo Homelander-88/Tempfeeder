@@ -21,10 +21,25 @@ api.interceptors.response.use(
     (error) => {
         if (error.response?.status === 401) {
             // Token expired or invalid - clear authentication and redirect
-            console.log('Token expired or invalid - logging out user');
+            console.log('Token expired or invalid - clearing all caches, logging out user');
             localStorage.removeItem('token');
             localStorage.removeItem('user');
 
+            localStorage.removeItem('hierarchy');
+            localStorage.removeItem('contentMode');
+
+            try{
+                const keysTORemove: string[] =[];
+                for(let i=0;i<sessionStorage.length;i++){
+                    const key = sessionStorage.key(i);
+                    if(key && (key.startsWith('content_cache_') || key.startsWith('topics_cache_') || key.startsWith('subtopics_cache_'))){
+                        keysTORemove.push(key);
+                    }
+                }
+                keysTORemove.forEach(key => sessionStorage.removeItem(key));
+            } catch (error) {
+                console.error('Error clearing caches:', error);
+            }
             // Redirect to login page
             window.location.href = '/';
         }
